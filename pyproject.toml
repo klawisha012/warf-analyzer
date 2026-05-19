@@ -1,0 +1,37 @@
+[project]
+name = "riven-scanner-backend"
+version = "0.1.0"
+description = "Warframe Riven Scanner — FastAPI backend (rewrite of the legacy PySide6 desktop app)."
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.18.4",
+    "asyncpg>=0.31.0",
+    "fastapi>=0.136.1",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.14.1",
+    "python-dotenv>=1.2.2",
+    "sqlalchemy[asyncio]>=2.0.49",
+    "uvicorn[standard]>=0.47.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend/app"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+    "ruff>=0.15.13",
+]

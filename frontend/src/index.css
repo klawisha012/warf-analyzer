@@ -1,0 +1,185 @@
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* === RIVEN SCANNER — "SLATE" =============================================
+   Linear/Vercel-style modern dark dashboard. Refined neutrals, Geist Sans &
+   Geist Mono, ONE soft indigo accent. No glow, no scanlines, no corner
+   brackets — quiet UI that gets out of the way of the data.
+   -------------------------------------------------------------------------- */
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    /* --- Typography ---------------------------------------------------- */
+    --font-sans: 'Geist', system-ui, -apple-system, sans-serif;
+    --font-mono: 'Geist Mono', ui-monospace, "SF Mono", Consolas, monospace;
+    --font-heading: 'Geist', system-ui, sans-serif;
+
+    /* --- Shadcn token surface (mapped to slate palette) ---------------- */
+    --color-background: var(--rs-bg);
+    --color-foreground: var(--rs-text);
+    --color-card: var(--rs-panel);
+    --color-card-foreground: var(--rs-text);
+    --color-popover: var(--rs-panel-hi);
+    --color-popover-foreground: var(--rs-text);
+    --color-primary: var(--rs-accent);
+    --color-primary-foreground: oklch(0.10 0.040 280);
+    --color-secondary: var(--rs-panel-hi);
+    --color-secondary-foreground: var(--rs-text);
+    --color-muted: var(--rs-panel-hi);
+    --color-muted-foreground: var(--rs-dim);
+    --color-accent: var(--rs-accent);
+    --color-accent-foreground: oklch(0.10 0.040 280);
+    --color-destructive: var(--rs-danger);
+    --color-border: var(--rs-border);
+    --color-input: var(--rs-border);
+    --color-ring: var(--rs-accent);
+
+    /* Recharts hooks */
+    --color-chart-1: var(--rs-accent);
+    --color-chart-2: var(--rs-success);
+    --color-chart-3: var(--rs-warn);
+    --color-chart-4: var(--rs-dim);
+    --color-chart-5: var(--rs-danger);
+
+    /* --- Radius (8px scale; soft but not pill-shaped) ------------------ */
+    --radius: 8px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 10px;
+    --radius-xl: 12px;
+
+    /* --- Slate palette (exposed as Tailwind color utilities) ----------- */
+    --color-rs-bg: var(--rs-bg);
+    --color-rs-panel: var(--rs-panel);
+    --color-rs-panel-hi: var(--rs-panel-hi);
+    --color-rs-border: var(--rs-border);
+    --color-rs-border-hi: var(--rs-border-hi);
+    --color-rs-text: var(--rs-text);
+    --color-rs-dim: var(--rs-dim);
+    --color-rs-mute: var(--rs-mute);
+    --color-rs-accent: var(--rs-accent);
+    --color-rs-accent-dim: var(--rs-accent-dim);
+    --color-rs-success: var(--rs-success);
+    --color-rs-warn: var(--rs-warn);
+    --color-rs-danger: var(--rs-danger);
+
+    /* --- Stat-bar gradient stops (warn → success → accent) -------------
+       Replaces the red→amber→green ramp; the Slate ramp signals quality on
+       a calmer hue path: a low stat is yellow-ish (warn), mid is green
+       (success), great is indigo (accent). */
+    --color-stat-low: var(--rs-warn);
+    --color-stat-mid: var(--rs-success);
+    --color-stat-high: var(--rs-accent);
+}
+
+/* === Raw palette (dark-first) ============================================ */
+:root {
+    /* Neutral ladder (cool gray, tiny chroma) */
+    --rs-bg:         oklch(0.16 0.004 270);   /* #0c0c0e — page bg */
+    --rs-panel:      oklch(0.20 0.004 270);   /* #141416 — card    */
+    --rs-panel-hi:   oklch(0.23 0.005 270);   /* #1a1a1d — input/elevated */
+    --rs-border:     oklch(0.29 0.005 270);   /* #26262a — hairline */
+    --rs-border-hi:  oklch(0.34 0.006 270);   /* #34343a — emphasised */
+
+    /* Text ladder */
+    --rs-text:       oklch(0.93 0.003 270);   /* #e7e7e8 */
+    --rs-dim:        oklch(0.72 0.005 270);   /* #a1a1a6 */
+    --rs-mute:       oklch(0.52 0.006 270);   /* #6a6a70 */
+
+    /* Single accent: soft indigo. Used SPARINGLY — priority, primary CTA,
+       focused inputs, chart line. Everything else lives in neutrals. */
+    --rs-accent:     oklch(0.72 0.150 285);   /* #8a82ff */
+    --rs-accent-dim: oklch(0.55 0.130 285);
+
+    /* Semantic */
+    --rs-success:    oklch(0.80 0.140 152);   /* #65d39a */
+    --rs-warn:       oklch(0.80 0.130 75);    /* #f4b358 */
+    --rs-danger:     oklch(0.68 0.180 22);    /* #ef6c6c */
+
+    color-scheme: dark;
+}
+
+/* === Base resets ========================================================= */
+@layer base {
+    * {
+        @apply border-border outline-ring/40;
+    }
+
+    html {
+        font-family: var(--font-sans);
+        font-feature-settings: "ss01" 1, "ss02" 1, "cv11" 1;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+        background: var(--rs-bg);
+        color: var(--rs-text);
+        letter-spacing: -0.005em;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+        min-height: 100vh;
+    }
+
+    /* Monospace numerals where explicitly asked for via .num */
+    .num, [data-num] {
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0;
+    }
+
+    /* Headings stay Geist, just heavier — no Orbitron all-caps screaming */
+    h1, h2, h3 {
+        font-family: var(--font-heading);
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+    h1 { font-size: 1.875rem; }
+    h2 { font-size: 1.375rem; }
+    h3 { font-size: 1.0625rem; }
+
+    /* Selection */
+    ::selection {
+        background: color-mix(in oklch, var(--rs-accent) 30%, transparent);
+        color: var(--rs-text);
+    }
+
+    /* Scrollbars — slim, neutral */
+    ::-webkit-scrollbar         { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track   { background: transparent; }
+    ::-webkit-scrollbar-thumb   { background: var(--rs-border-hi); border-radius: 5px; }
+    ::-webkit-scrollbar-thumb:hover { background: color-mix(in oklch, var(--rs-border-hi) 70%, var(--rs-text)); }
+}
+
+/* === Utilities =========================================================== */
+@layer utilities {
+    /* Stat-bar fill gradient — warn → success → accent */
+    .rs-stat-fill {
+        background-image: linear-gradient(
+            90deg,
+            var(--rs-warn) 0%,
+            var(--rs-success) 55%,
+            var(--rs-accent) 100%
+        );
+    }
+
+    /* Subtle gradient backdrop for the brand mark */
+    .rs-brand-mark {
+        background: linear-gradient(135deg, var(--rs-accent), var(--rs-accent-dim));
+    }
+
+    /* Tonal panel — slightly elevated, hairline ring instead of shadow */
+    .rs-panel {
+        background: var(--rs-panel);
+        border: 1px solid var(--rs-border);
+        border-radius: var(--radius-lg);
+    }
+
+    /* Optional: priority outline. Replaces the old corner-bracket vibe. */
+    .rs-priority-outline {
+        border: 1px solid color-mix(in oklch, var(--rs-accent) 35%, var(--rs-border));
+    }
+}

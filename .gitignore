@@ -1,0 +1,48 @@
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# Node / Vite
+node_modules/
+dist-ssr/
+*.local
+
+# Environment — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# User-specific app settings
+settings.json
+
+# AI / tooling artifacts
+.claude/
+.playwright-mcp/
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database artifacts (legacy SQLite files)
+*.db
+
+# Logs
+*.log
+RIVEN_ENDO_ERROR_LOG_*.txt
+
+# Compose overrides
+docker-compose.override.yml

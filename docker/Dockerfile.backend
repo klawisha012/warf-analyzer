@@ -1,0 +1,45 @@
+## Backend image — uv-managed FastAPI app.
+##
+## Build context is the REPO ROOT, so paths to `pyproject.toml`, `uv.lock`,
+## and `backend/` are at the top of the context.
+
+FROM ghcr.io/astral-sh/uv:bookworm-slim AS builder
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_NO_DEV=1 \
+    UV_PYTHON_INSTALL_DIR=/python \
+    UV_PYTHON_PREFERENCE=only-managed
+RUN uv python install 3.12
+
+WORKDIR /app
+
+# Phase 1: install dependencies only (no project) so this layer caches across
+# code edits. Bind-mount the manifest + lockfile so they don't bloat the layer.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    uv sync --locked --no-install-project
+
+# Phase 2: copy the project source + manifest, then sync again so the project
+# itself (the `app` package declared in `[tool.hatch.build.targets.wheel]`)
+# gets installed into the venv.
+COPY backend /app/backend
+COPY pyproject.toml uv.lock /app/
+# Legacy settings.json — seed source for `uv run python -m app.seed`. It is the
+# only file outside backend/ that the runtime image needs; ship it so first-run
+# bootstrap works without a host mount.
+COPY settings.json /app/settings.json
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked
+
+# Final stage settings
+ENV PATH="/app/.venv/bin:$PATH"
+WORKDIR /app/backend
+ENTRYPOINT []
+EXPOSE 8000
+
+# Alembic runs against the live Postgres each boot; then uvicorn serves.
+# `app.main:app` resolves because Phase 1 declared the `app` package as a
+# wheel target, so `uv sync` installs it into the venv and Python can find it
+# regardless of CWD. The CWD is `/app/backend` so Alembic finds `alembic.ini`.
+CMD ["sh", "-c", "uv run alembic upgrade head && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000"]
