@@ -78,26 +78,26 @@
 /* === Raw palette (dark-first) ============================================ */
 :root {
     /* Neutral ladder (cool gray, tiny chroma) */
-    --rs-bg:         oklch(0.16 0.004 270);   /* #0c0c0e — page bg */
-    --rs-panel:      oklch(0.20 0.004 270);   /* #141416 — card    */
-    --rs-panel-hi:   oklch(0.23 0.005 270);   /* #1a1a1d — input/elevated */
-    --rs-border:     oklch(0.29 0.005 270);   /* #26262a — hairline */
-    --rs-border-hi:  oklch(0.34 0.006 270);   /* #34343a — emphasised */
+    --rs-bg:         #0a0a0c;   /* #0c0c0e — page bg */
+    --rs-panel:      #111113;   /* #141416 — card    */
+    --rs-panel-hi:   #18181a;   /* #1a1a1d — input/elevated */
+    --rs-border:     #252529;   /* #26262a — hairline */
+    --rs-border-hi:  #333338;   /* #34343a — emphasised */
 
     /* Text ladder */
-    --rs-text:       oklch(0.93 0.003 270);   /* #e7e7e8 */
-    --rs-dim:        oklch(0.72 0.005 270);   /* #a1a1a6 */
-    --rs-mute:       oklch(0.52 0.006 270);   /* #6a6a70 */
+    --rs-text:       #f5f5f6;   /* #e7e7e8 */
+    --rs-dim:        #a3a3a8;   /* #a1a1a6 */
+    --rs-mute:       #6b6b72;   /* #6a6a70 */
 
     /* Single accent: soft indigo. Used SPARINGLY — priority, primary CTA,
        focused inputs, chart line. Everything else lives in neutrals. */
-    --rs-accent:     oklch(0.72 0.150 285);   /* #8a82ff */
-    --rs-accent-dim: oklch(0.55 0.130 285);
+    --rs-accent:     #d946ef;   /* #8a82ff */
+    --rs-accent-dim: #a21caf;
 
     /* Semantic */
-    --rs-success:    oklch(0.80 0.140 152);   /* #65d39a */
-    --rs-warn:       oklch(0.80 0.130 75);    /* #f4b358 */
-    --rs-danger:     oklch(0.68 0.180 22);    /* #ef6c6c */
+    --rs-success:    #10b981;   /* #65d39a */
+    --rs-warn:       #f59e0b;    /* #f4b358 */
+    --rs-danger:     #ef4444;    /* #ef6c6c */
 
     color-scheme: dark;
 }
@@ -171,11 +171,14 @@
         background: linear-gradient(135deg, var(--rs-accent), var(--rs-accent-dim));
     }
 
-    /* Tonal panel — slightly elevated, hairline ring instead of shadow */
+    /* Cyberpunk panel */
     .rs-panel {
-        background: var(--rs-panel);
-        border: 1px solid var(--rs-border);
+        background: linear-gradient(180deg, var(--rs-panel) 0%, var(--rs-bg) 100%);
+        border: 1px solid color-mix(in srgb, var(--rs-accent) 20%, transparent);
         border-radius: var(--radius-lg);
+        box-shadow: inset 0 1px 0 color-mix(in srgb, white 5%, transparent),
+                    0 4px 20px -5px color-mix(in srgb, var(--rs-accent) 15%, transparent);
+        backdrop-filter: blur(8px);
     }
 
     /* Optional: priority outline. Replaces the old corner-bracket vibe. */

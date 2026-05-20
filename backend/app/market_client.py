@@ -42,7 +42,7 @@ def build_similar_url(attributes: list[dict[str, Any]], weapon: str) -> str:
     base = f"{settings.WARFRAME_API_BASE}/auctions/search?type=riven&positive_stats="
     pos_count = len(attributes)
     has_neg = False
-    if attributes and attributes[-1].get("positive", False) is False:
+    if attributes and attributes[-1].get("positive", True) is False:
         pos_count -= 1
         has_neg = True
 
