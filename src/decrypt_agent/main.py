@@ -21,7 +21,6 @@ import asyncio
 import json
 import logging
 import os
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +28,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 log = logging.getLogger("decrypt_agent")
+_background_tasks: set[asyncio.Task[None]] = set()
 
 # ------------------------------------------------------------------ config
 
@@ -80,12 +80,15 @@ async def _run_dump_script(script_path: Path, out_dir: Path, pwsh: str) -> dict[
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
     )
     stdout_b, stderr_b = await proc.communicate()
-    stdout = stdout_b.decode("utf-8", errors="replace").strip()
+    stdout = stdout_b.decode("utf-8-sig", errors="replace").strip()
     stderr = stderr_b.decode("utf-8", errors="replace").strip()
     if proc.returncode != 0:
         raise RuntimeError(f"pwsh exit {proc.returncode}: {stdout or stderr}")
+    lines = stdout.splitlines()
+    if not lines:
+        raise RuntimeError("pwsh exited 0 but produced no stdout")
     try:
-        return json.loads(stdout.splitlines()[-1])
+        return json.loads(lines[-1])
     except Exception as e:
         raise RuntimeError(f"could not parse pwsh output: {e!r}; raw={stdout!r}") from e
 
@@ -94,7 +97,7 @@ async def _show_toast(req: ToastRequest) -> None:
     """Schedule a Windows toast. Lazy import keeps tests/cross-platform clean."""
     try:
         from win10toast_click import ToastNotifier  # type: ignore[import-untyped]
-    except Exception as e:
+    except ImportError as e:
         log.warning("toast unavailable (%s); skipping", e)
         return
 
@@ -160,14 +163,16 @@ def build_app() -> FastAPI:
             return RefreshResult(ok=True, stub=True, elapsed_ms=0)
         try:
             result = await _run_dump_script(dump_script, out_dir, pwsh)
-            return RefreshResult(**result)
         except Exception as e:
             log.exception("refresh failed")
-            return RefreshResult(ok=False, error=str(e))
+            raise HTTPException(500, f"dump script failed: {e}") from e
+        return RefreshResult(**result)
 
     @app.post("/toast", status_code=202)
     async def toast(req: ToastRequest) -> dict[str, str]:
-        asyncio.create_task(_show_toast(req))
+        t = asyncio.create_task(_show_toast(req))
+        _background_tasks.add(t)
+        t.add_done_callback(_background_tasks.discard)
         return {"status": "scheduled"}
 
     return app
