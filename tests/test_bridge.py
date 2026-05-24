@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import httpx
 import pytest
 from pytest_httpx import HTTPXMock
 
@@ -38,7 +39,7 @@ async def test_refresh_agent_down_raises(
     tmp_data_dir: Path, httpx_mock: HTTPXMock
 ) -> None:
     httpx_mock.add_exception(
-        Exception("connection refused"),
+        httpx.ConnectError("connection refused"),
         url="http://agent.test/refresh", method="POST",
     )
     br = AlecaBridge(agent_url="http://agent.test", data_dir=tmp_data_dir)

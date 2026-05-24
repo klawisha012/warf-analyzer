@@ -69,7 +69,7 @@ class AlecaBridge:
                     r = await client.post(f"{self.agent_url.rstrip('/')}/refresh")
                     r.raise_for_status()
                     payload = r.json()
-            except Exception as e:
+            except (httpx.HTTPError, ValueError) as e:
                 raise BridgeError(f"agent /refresh failed: {e}") from e
             self.reload_from_disk(force=True)
             return payload
