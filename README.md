@@ -26,46 +26,98 @@ HWID-ключ не вынести.
 | | |
 |---|---|
 | OS | Windows 10 / 11 |
-| Python | 3.12+ (тестировал на 3.13.12) |
-| pwsh | PowerShell 7.x (`pwsh.exe`) |
+| Python | 3.13+ |
+| Node.js | 22+ (только для разработки фронта) |
+| pwsh | PowerShell 7.x |
+| Docker Desktop | актуальная версия, WSL2 backend |
 | AlecaFrame | установлена через Overwolf, хотя бы раз запускалась |
-| uv | для управления зависимостями |
+| uv | для зависимостей Python |
+
+## Архитектура (B.0)
+
+Бэкенд и инфраструктура — в docker-compose. Расшифровка `.dat` файлов
+требует Windows-only DLL, поэтому она вынесена в отдельный host-процесс
+`decrypt-agent` (tray-app), к которому backend-контейнер обращается через
+`host.docker.internal:8788`.
+
+```
+host:                  docker compose:
+┌────────────────┐    ┌──────────────────────────────────────┐
+│ decrypt-agent  │    │ frontend (:3000)  ─── nginx + Solid  │
+│  pystray tray  │    │                                       │
+│  :8788  ◀──────┼────┤ backend  (:8765) ─── FastAPI         │
+│  pwsh + DLL    │    │ poller          ─── worker stub      │
+│                │    │ redis    (:6379)                     │
+│  writes ./data │    │ rabbitmq (:5672/:15672)             │
+└────────────────┘    │ centrifugo (:8002 host → :8000 inner)│
+                      └──────────────────────────────────────┘
+```
+
+Note: Centrifugo на хосте маппится на 8002, а не 8000 — порт 8000 занят Docker Desktop.
+Внутри compose network — обычный 8000. Frontend nginx правильно проксирует.
 
 ## Установка
 
 ```powershell
-cd "B:\Sync\Programming\projects\aleca frame inventory"
-uv sync
+git clone <repo> ; cd "aleca frame inventory"
+uv sync                              # Python deps
+Push-Location frontend ; npm install ; Pop-Location   # frontend deps
+Copy-Item .env.example .env
 ```
+
+Если `uv sync` падает из-за того, что `alecaframe-poller.exe` залочен Windows Defender —
+добавь папку проекта в Defender exclusions, или закрой запущенные процессы Python
+из предыдущего сеанса.
 
 ## Запуск
 
 ```powershell
-# самый простой
-uv run alecaframe-api
-
-# с автоперезагрузкой
-$env:ALECA_RELOAD = "1"; uv run alecaframe-api
-
-# напрямую через uvicorn
-uv run uvicorn alecaframe_api.main:app --reload --port 8765
+./scripts/start-stack.ps1
 ```
 
-Открыть `http://127.0.0.1:8765/docs` — Swagger UI с интерактивными запросами.
+Что делает скрипт:
+1. Запускает `decrypt-agent` в отдельном окне (если ещё не запущен)
+2. `docker compose up -d` — все шесть сервисов
+3. Ждёт `/healthz` бэкенда и печатает три URL-а
+
+UI: <http://127.0.0.1:3000>
+API: <http://127.0.0.1:8765/docs>
+RabbitMQ UI: <http://127.0.0.1:15672> (aleca / aleca-local)
+
+Полная остановка:
+
+```powershell
+docker compose down
+# и Quit из tray-меню decrypt-agent
+```
+
+## Разработка фронта вне docker
+
+В docker-compose фронт собран и отдаётся через nginx. Для быстрого
+HMR-цикла:
+
+```powershell
+docker compose up -d redis rabbitmq centrifugo backend poller
+cd frontend
+npm run dev   # vite на :5173, /api проксируется в backend
+```
 
 ## Конфиг (env vars)
 
 | Переменная | Дефолт | Назначение |
 |---|---|---|
-| `ALECA_HOST` | `127.0.0.1` | bind host |
-| `ALECA_PORT` | `8765` | bind port |
-| `ALECA_TTL_SECONDS` | `60` | TTL кеша; после истечения первый запрос триггерит refresh |
-| `ALECA_DATA_DIR` | `./data` | куда писать расшифрованные JSON |
-| `ALECA_SCRIPT` | `./scripts/dump_inventory.ps1` | путь к pwsh-скрипту |
-| `ALECA_PWSH` | `pwsh` | имя бинаря PowerShell 7 |
-| `ALECA_DATA_HOME` | `%LOCALAPPDATA%\AlecaFrame` | папка AlecaFrame |
+| `ALECA_AGENT_URL` | `http://host.docker.internal:8788` | где живёт decrypt-agent |
+| `ALECA_REDIS_URL` | `redis://redis:6379/0` | L1-кеш, общий rate-limiter (B.1+) |
+| `ALECA_RABBITMQ_URL` | `amqp://aleca:aleca-local@rabbitmq:5672/` | event bus |
+| `ALECA_CENTRIFUGO_API` | `http://centrifugo:8000/api` | publish events to UI |
+| `ALECA_CENTRIFUGO_API_KEY` | (override в `.env`) | secret для publish |
+| `ALECA_CENTRIFUGO_TOKEN_HMAC_SECRET` | (override в `.env`) | HMAC ключ для JWT-токенов клиентов |
+| `ALECA_DATA_DIR` | `/data` | mounted volume с расшифрованным JSON |
+| `ALECA_TTL_SECONDS` | `60` | TTL backend-кеша |
+| `ALECA_WFM_PLATFORM` | `pc` | `pc` / `xbox` / `ps4` / `switch` |
 | `ALECA_LOG_LEVEL` | `INFO` | уровень логов |
-| `ALECA_RELOAD` | — | `1` = uvicorn reload |
+| `AGENT_PORT` | `8788` | порт decrypt-agent (host) |
+| `AGENT_OUT_DIR` | `./data` (рядом с проектом) | куда писать JSON |
 
 ## Endpoints
 
@@ -117,20 +169,25 @@ curl -X POST http://127.0.0.1:8765/refresh | jq .
 
 ```
 aleca frame inventory/
-├── pyproject.toml
-├── README.md
+├── docker-compose.yml
+├── .env.example
+├── docker/
+│   ├── backend/Dockerfile
+│   ├── poller/Dockerfile
+│   ├── frontend/{Dockerfile, nginx.conf}
+│   ├── centrifugo/config.json
+│   ├── rabbitmq/{definitions.json, rabbitmq.conf}
+│   └── redis/redis.conf
 ├── scripts/
-│   └── dump_inventory.ps1     # вызов AlecaFrameClientLib.dll
-├── src/alecaframe_api/
-│   ├── __init__.py
-│   ├── main.py                 # FastAPI app + endpoints
-│   ├── bridge.py               # pwsh runner + in-memory cache
-│   ├── naming.py               # uniqueName → display name resolver
-│   └── schemas.py              # Pydantic response models
-└── data/                       # gitignored, расшифрованные JSON
-    ├── lastData.json
-    ├── deltas.json
-    └── _meta.json
+│   ├── dump_inventory.ps1
+│   └── start-stack.ps1
+├── src/
+│   ├── alecaframe_api/        # backend (in container)
+│   └── decrypt_agent/         # host-side (tray app)
+├── frontend/                  # SolidJS + Vite + Tailwind 4
+├── tests/
+├── data/                      # gitignored: shared volume
+└── docs/superpowers/{specs,plans}/
 ```
 
 ## Известные ограничения
