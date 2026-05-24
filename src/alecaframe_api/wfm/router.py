@@ -7,7 +7,10 @@ populated by main.py's lifespan. Heavy lifting lives in `wfm/prices.py`,
 from __future__ import annotations
 
 import datetime as _dt
+import logging
 from typing import Annotated, Any
+
+log = logging.getLogger("alecaframe.wfm.router")
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -76,6 +79,23 @@ def _order_to_row(o: dict) -> OrderRow:
     )
 
 
+async def _ensure_slug_catalogue(client, resolver) -> None:
+    """Lazy-bootstrap the slug catalogue if it's empty.
+
+    Lifespan tries this once; if it failed (e.g. agent down), the catalogue
+    stays empty for the lifetime of the process. This helper retries on the
+    first endpoint hit that needs it. Best-effort — if WFM is unreachable too,
+    we just leave the resolver empty and the endpoint surfaces the WFM error.
+    """
+    if resolver.size() > 0:
+        return
+    try:
+        items = await client.get_items()
+        resolver.load(items)
+    except Exception as e:
+        log.warning("lazy slug bootstrap failed: %s", e)
+
+
 # ----------------------------------------------------------------- /wfm/*
 
 
@@ -83,11 +103,14 @@ def _order_to_row(o: dict) -> OrderRow:
     "/wfm/items", response_model=WFMItemsResponse,
     summary="WFM slug catalogue (24h cache)",
 )
-async def wfm_items(client: WFMClientDep) -> WFMItemsResponse:
+async def wfm_items(client: WFMClientDep, resolver: SlugResolverDep) -> WFMItemsResponse:
     try:
         items = await client.get_items()
     except WFMError as e:
         raise HTTPException(503, str(e)) from e
+    # Side effect: refresh the in-memory resolver so subsequent /wfm/orders/{slug}
+    # works even if lifespan bootstrap failed.
+    resolver.load(items)
     return WFMItemsResponse(
         total=len(items),
         items=[
@@ -111,6 +134,7 @@ async def wfm_orders(
     include_offline: Annotated[bool, Query(description="Include offline orders")] = False,
     fresh: Annotated[bool, Query(description="Bypass cache")] = False,
 ) -> OrderBookResponse:
+    await _ensure_slug_catalogue(client, resolver)
     item = resolver.by_slug(slug)
     if item is None:
         raise HTTPException(404, f"unknown slug '{slug}'")
