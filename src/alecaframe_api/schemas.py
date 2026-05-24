@@ -98,3 +98,120 @@ class ApiInfo(BaseModel):
     version: str
     docs_url: str = "/docs"
     endpoints: list[str]
+
+
+# ---------------------------------------------------------------- WFM models
+
+
+class OrderRow(BaseModel):
+    side: str           # "sell" | "buy"
+    price: int
+    qty: int
+    user: str
+    status: str
+    reputation: int
+    platform: str = "pc"
+
+
+class OrderBookStatsModel(BaseModel):
+    side: str
+    online_only: bool
+    count_orders: int
+    volume_qty: int
+    min_price: int | None
+    p10: int | None
+    p25: int | None
+    median: int | None
+    p75: int | None
+    p90: int | None
+    max_price: int | None
+    top5: list[int]
+
+
+class OrderBookResponse(BaseModel):
+    slug: str
+    item_name: str
+    fetched_at: str
+    stale: bool = False
+    sell: OrderBookStatsModel
+    buy: OrderBookStatsModel
+    top_orders: list[OrderRow] = Field(default_factory=list)
+
+
+class PricedItemEntry(BaseModel):
+    unique_name: str
+    name: str
+    slug: str | None
+    count: int | None = None
+    vaulted: bool | None = None
+    sell_min: int | None = None
+    sell_median: int | None = None
+    sell_spread: int | None = None
+    buy_max: int | None = None
+    estimated_value: int | None = None
+    stale: bool = False
+
+
+class PricedItemListResponse(BaseModel):
+    total: int
+    returned: int
+    items: list[PricedItemEntry]
+
+
+class SetProfitRowModel(BaseModel):
+    set_slug: str
+    set_name: str
+    set_price: int
+    parts_cost: int
+    tax_estimate: int
+    profit: int
+    missing_parts: dict[str, int]
+    owned_parts: dict[str, int]
+
+
+class SetProfitResponse(BaseModel):
+    total: int
+    returned: int
+    items: list[SetProfitRowModel]
+
+
+class WtbMatchRow(BaseModel):
+    slug: str
+    item_name: str
+    your_qty: int
+    buyer: str
+    buyer_status: str
+    buyer_reputation: int
+    offer_price: int
+
+
+class WtbMatchResponse(BaseModel):
+    total: int
+    items: list[WtbMatchRow]
+
+
+class RelistNudgeRow(BaseModel):
+    slug: str
+    item_name: str
+    your_price: int
+    median: int | None
+    top5: list[int]
+    suggestion: str   # e.g. "raise to 36" / "lower to 33"
+
+
+class RelistNudgeResponse(BaseModel):
+    total: int
+    items: list[RelistNudgeRow]
+
+
+class WFMItemRef(BaseModel):
+    slug: str
+    item_name: str
+    thumb_url: str | None
+    vaulted: bool
+    wfm_id: str
+
+
+class WFMItemsResponse(BaseModel):
+    total: int
+    items: list[WFMItemRef]
