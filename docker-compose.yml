@@ -1,0 +1,70 @@
+name: alecaframe
+
+x-backend-env: &backend-env
+  ALECA_AGENT_URL: ${ALECA_AGENT_URL:-http://host.docker.internal:8788}
+  ALECA_REDIS_URL: redis://redis:6379/0
+  ALECA_RABBITMQ_URL: amqp://aleca:aleca-local@rabbitmq:5672/
+  ALECA_CENTRIFUGO_API: http://centrifugo:8000/api
+  ALECA_CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:-local-dev-api-key-change-me}
+  ALECA_DATA_DIR: /data
+  ALECA_TTL_SECONDS: ${ALECA_TTL_SECONDS:-60}
+  ALECA_WFM_PLATFORM: ${ALECA_WFM_PLATFORM:-pc}
+  ALECA_LOG_LEVEL: ${ALECA_LOG_LEVEL:-INFO}
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: aleca-redis
+    restart: unless-stopped
+    ports: ["127.0.0.1:6379:6379"]
+    volumes:
+      - redis-data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: aleca-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: aleca
+      RABBITMQ_DEFAULT_PASS: aleca-local
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ./docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./docker/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  centrifugo:
+    image: centrifugo/centrifugo:v6
+    container_name: aleca-centrifugo
+    restart: unless-stopped
+    ports: ["127.0.0.1:8002:8000"]
+    environment:
+      CENTRIFUGO_HTTP_API_KEY: ${CENTRIFUGO_API_KEY:-local-dev-api-key-change-me}
+      CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY: ${CENTRIFUGO_TOKEN_HMAC_SECRET:-local-dev-hmac-secret-change-me}
+    volumes: ["./docker/centrifugo/config.json:/centrifugo/config.json:ro"]
+    command: ["centrifugo", "-c", "/centrifugo/config.json"]
+    ulimits:
+      nofile: { soft: 65536, hard: 65536 }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "--header=X-API-Key: local-dev-api-key-change-me", "--post-data={}", "--header=Content-Type: application/json", "http://127.0.0.1:8000/api/info"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+volumes:
+  redis-data:
+  rabbitmq-data:

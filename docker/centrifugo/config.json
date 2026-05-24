@@ -1,0 +1,39 @@
+{
+  "engine": { "type": "memory" },
+  "http_api": {
+    "key": "local-dev-api-key-change-me"
+  },
+  "client": {
+    "allowed_origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+    "token": {
+      "hmac_secret_key": "local-dev-hmac-secret-change-me"
+    }
+  },
+  "channel": {
+    "without_namespace": {
+      "presence": false,
+      "history_size": 10,
+      "history_ttl": "60s"
+    },
+    "namespaces": [
+      {
+        "name": "alert",
+        "presence": false,
+        "history_size": 50,
+        "history_ttl": "1h"
+      },
+      {
+        "name": "wfm",
+        "presence": false,
+        "history_size": 100,
+        "history_ttl": "10m"
+      },
+      {
+        "name": "system",
+        "presence": false,
+        "history_size": 20,
+        "history_ttl": "10m"
+      }
+    ]
+  }
+}

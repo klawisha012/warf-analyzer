@@ -1,0 +1,33 @@
+{
+  "rabbit_version": "4.0.0",
+  "users": [
+    {
+      "name": "aleca",
+      "password": "aleca-local",
+      "tags": "administrator"
+    }
+  ],
+  "vhosts": [{ "name": "/" }],
+  "permissions": [
+    {
+      "user": "aleca", "vhost": "/",
+      "configure": ".*", "write": ".*", "read": ".*"
+    }
+  ],
+  "exchanges": [
+    { "name": "wfm",     "vhost": "/", "type": "topic", "durable": true,  "auto_delete": false },
+    { "name": "signals", "vhost": "/", "type": "topic", "durable": true,  "auto_delete": false }
+  ],
+  "queues": [
+    { "name": "wfm.live.orders", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+    { "name": "wfm.snapshots",   "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+    { "name": "wfm.commands",    "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+    { "name": "signals.new",     "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} }
+  ],
+  "bindings": [
+    { "source": "wfm",     "vhost": "/", "destination": "wfm.live.orders", "destination_type": "queue", "routing_key": "live.orders.*",  "arguments": {} },
+    { "source": "wfm",     "vhost": "/", "destination": "wfm.snapshots",   "destination_type": "queue", "routing_key": "snapshots.*",   "arguments": {} },
+    { "source": "wfm",     "vhost": "/", "destination": "wfm.commands",    "destination_type": "queue", "routing_key": "commands.*",    "arguments": {} },
+    { "source": "signals", "vhost": "/", "destination": "signals.new",     "destination_type": "queue", "routing_key": "new.*",         "arguments": {} }
+  ]
+}
