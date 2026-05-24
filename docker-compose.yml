@@ -72,6 +72,47 @@ services:
       retries: 6
       start_period: 10s
 
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    container_name: aleca-backend
+    restart: unless-stopped
+    ports: ["127.0.0.1:8765:8765"]
+    environment:
+      <<: *backend-env
+    volumes:
+      - ./data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      centrifugo: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/healthz',timeout=3).status==200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  poller:
+    build:
+      context: .
+      dockerfile: docker/poller/Dockerfile
+    container_name: aleca-poller
+    restart: unless-stopped
+    command: ["alecaframe-poller"]
+    environment:
+      <<: *backend-env
+    volumes:
+      - ./data:/data:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
 volumes:
   redis-data:
   rabbitmq-data:
