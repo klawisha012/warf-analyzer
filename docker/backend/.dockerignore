@@ -1,0 +1,14 @@
+.venv
+.git
+.gitignore
+data
+docs
+docker
+frontend
+__pycache__
+.pytest_cache
+.ruff_cache
+.mypy_cache
+*.pyc
+node_modules
+tests
