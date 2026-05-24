@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 
 from . import __version__
 from .bridge import AlecaBridge, BridgeError
+from .config import get_settings
 from .naming import NameResolver
 from .schemas import (
     ApiInfo,
@@ -44,16 +45,15 @@ log = logging.getLogger("alecaframe.main")
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_DATA_DIR = _PROJECT_ROOT / "data"
-_DEFAULT_SCRIPT = _PROJECT_ROOT / "scripts" / "dump_inventory.ps1"
 
-DATA_DIR = Path(os.getenv("ALECA_DATA_DIR", _DEFAULT_DATA_DIR))
-SCRIPT_PATH = Path(os.getenv("ALECA_SCRIPT", _DEFAULT_SCRIPT))
-PWSH_PATH = os.getenv("ALECA_PWSH", "pwsh")
-TTL_SECONDS = int(os.getenv("ALECA_TTL_SECONDS", "60"))
-ALECA_DATA_HOME = Path(
-    os.getenv("ALECA_DATA_HOME") or
-    (Path(os.getenv("LOCALAPPDATA", "")) / "AlecaFrame")
-)
+_settings = get_settings()
+DATA_DIR = _settings.data_dir
+TTL_SECONDS = _settings.ttl_seconds
+AGENT_URL = _settings.agent_url
+# Static name DB still comes from the host (it ships with AlecaFrame).
+# When backend runs in a container the engineer mounts it as /data/cachedData/json
+# (handled by docker-compose in Task 9).
+ALECA_DATA_HOME = _settings.aleca_data_home or (DATA_DIR / "cachedData" / "json").parent
 
 # ----------------------------------------------------------------- lifespan
 
@@ -66,19 +66,18 @@ async def lifespan(app: FastAPI):
     global bridge, resolver
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     bridge = AlecaBridge(
-        script=SCRIPT_PATH,
+        agent_url=AGENT_URL,
         data_dir=DATA_DIR,
         ttl_seconds=TTL_SECONDS,
-        pwsh=PWSH_PATH,
     )
     resolver = NameResolver(ALECA_DATA_HOME / "cachedData" / "json")
-    # warm-up: try a refresh but don't fail startup if decrypt fails;
-    # the bridge still tries to reload from disk in that case so endpoints
-    # can serve cached JSON.
+    # Backend MUST start cleanly even when the agent is offline. We prefer fresh
+    # data, but tolerate every failure mode.
     try:
         await bridge.refresh()
     except BridgeError as e:
-        log.warning("startup refresh failed (%s); using disk fallback if available", e)
+        log.warning("startup refresh failed (%s); reading whatever is on disk", e)
+        bridge.reload_from_disk(force=True)
     yield
 
 
@@ -491,7 +490,7 @@ async def meta(br: BridgeDep) -> dict[str, Any]:
         "api_version": __version__,
         "data_dir": str(DATA_DIR),
         "aleca_data_home": str(ALECA_DATA_HOME),
-        "script": str(SCRIPT_PATH),
+        "agent_url": AGENT_URL,
         "ttl_seconds": TTL_SECONDS,
         "bridge_meta": br.meta,
     }
