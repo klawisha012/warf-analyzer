@@ -21,6 +21,7 @@ import asyncio
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -180,3 +181,79 @@ def build_app() -> FastAPI:
 
 # default app for `uvicorn decrypt_agent.main:app`
 app = build_app()
+
+
+# ------------------------------------------------------------------ tray + runner
+
+
+def _make_tray_icon(stop_event: "asyncio.Event", out_dir: Path):
+    """Build a pystray icon. Returns the Icon instance (caller calls .run())."""
+    import pystray
+    from PIL import Image, ImageDraw
+
+    img = Image.new("RGB", (64, 64), color=(20, 24, 38))
+    ImageDraw.Draw(img).rectangle((10, 10, 54, 54), outline=(120, 200, 255), width=4)
+
+    def _on_open_data(_icon, _item) -> None:
+        os.startfile(str(out_dir))  # type: ignore[attr-defined]  # Windows only
+
+    def _on_refresh(_icon, _item) -> None:
+        import urllib.request
+        try:
+            urllib.request.urlopen(
+                f"http://127.0.0.1:{os.getenv('AGENT_PORT', '8788')}/refresh",
+                data=b"", timeout=30,
+            )
+        except Exception as e:
+            log.warning("manual refresh failed: %s", e)
+
+    def _on_quit(icon, _item) -> None:
+        stop_event.set()
+        icon.stop()
+
+    menu = pystray.Menu(
+        pystray.MenuItem("Refresh now", _on_refresh),
+        pystray.MenuItem("Open data folder", _on_open_data),
+        pystray.MenuItem("Quit", _on_quit),
+    )
+    return pystray.Icon("AlecaFrame Agent", img, "AlecaFrame decrypt-agent", menu)
+
+
+def run() -> None:
+    """Console entry point: serves FastAPI on 127.0.0.1:AGENT_PORT and shows tray icon.
+
+    Tray and uvicorn run in parallel: uvicorn in a daemon thread, tray on the main thread.
+    """
+    import threading
+
+    import uvicorn
+
+    host = os.getenv("AGENT_HOST", "127.0.0.1")
+    port = int(os.getenv("AGENT_PORT", "8788"))
+    out_dir = _env_path("AGENT_OUT_DIR", _project_root() / "data")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    logging.basicConfig(
+        level=os.getenv("AGENT_LOG_LEVEL", "INFO"),
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+
+    stop_event = asyncio.Event()
+
+    def _serve() -> None:
+        uvicorn.run(app, host=host, port=port, log_level=os.getenv("AGENT_LOG_LEVEL", "info").lower())
+
+    server_thread = threading.Thread(target=_serve, daemon=True, name="agent-uvicorn")
+    server_thread.start()
+
+    # tray on the main thread (pywin32 / pystray requires it)
+    if sys.platform != "win32":
+        log.warning("non-Windows platform: tray disabled, running headless")
+        try:
+            server_thread.join()
+        except KeyboardInterrupt:
+            return
+        return
+
+    icon = _make_tray_icon(stop_event, out_dir)
+    icon.run()

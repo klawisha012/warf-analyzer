@@ -29,6 +29,7 @@ dev = [
 
 [project.scripts]
 alecaframe-api = "alecaframe_api.main:run"
+alecaframe-decrypt-agent = "decrypt_agent.main:run"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
