@@ -67,3 +67,43 @@ def test_rabbitmq_management() -> None:
     )
     assert r.status_code == 200
     assert "rabbitmq_version" in r.json()
+
+
+@pytest.mark.e2e
+def test_wfm_items_listing() -> None:
+    r = httpx.get("http://127.0.0.1:8765/wfm/items", timeout=10)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total"] > 1000   # WFM catalogue has thousands of slugs
+
+
+@pytest.mark.e2e
+def test_wfm_orders_for_known_slug() -> None:
+    r = httpx.get("http://127.0.0.1:8765/wfm/orders/kronen_prime_blade", timeout=15)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["slug"] == "kronen_prime_blade"
+    assert "sell" in body and "buy" in body
+    assert isinstance(body["sell"]["count_orders"], int)
+
+
+@pytest.mark.e2e
+def test_wfm_orders_unknown_slug_returns_404() -> None:
+    r = httpx.get("http://127.0.0.1:8765/wfm/orders/this_does_not_exist", timeout=10)
+    assert r.status_code == 404
+
+
+@pytest.mark.e2e
+def test_me_sets_profit() -> None:
+    r = httpx.get("http://127.0.0.1:8765/me/sets-profit", timeout=20)
+    assert r.status_code == 200
+    body = r.json()
+    assert "items" in body
+    # Tolerate empty list — depends on user's actual inventory.
+
+
+@pytest.mark.e2e
+def test_proxied_wfm_items_via_frontend() -> None:
+    r = httpx.get("http://127.0.0.1:3000/api/wfm/items", timeout=10)
+    assert r.status_code == 200
+    assert r.json()["total"] > 1000
