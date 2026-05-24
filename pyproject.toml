@@ -35,4 +35,5 @@ alecaframe-poller = "alecaframe_api.wfm.poller:run"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "-ra -q"
+addopts = "-ra -q -m 'not e2e'"
+markers = ["e2e: requires a running docker-compose stack"]

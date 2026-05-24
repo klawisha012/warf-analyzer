@@ -1,0 +1,69 @@
+"""End-to-end smoke test against a live stack.
+
+Run manually after `./scripts/start-stack.ps1`:
+    uv run pytest tests/test_smoke_e2e.py -m e2e -v
+"""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import pytest
+import httpx
+
+
+def _centrifugo_api_key() -> str:
+    """Read CENTRIFUGO_API_KEY from .env (dev default if not found)."""
+    env_file = Path(__file__).parent.parent / ".env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            if line.startswith("CENTRIFUGO_API_KEY="):
+                return line.split("=", 1)[1].strip()
+    return os.environ.get("CENTRIFUGO_API_KEY", "local-dev-api-key-change-me")
+
+
+@pytest.mark.e2e
+def test_backend_healthz() -> None:
+    r = httpx.get("http://127.0.0.1:8765/healthz", timeout=3)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+
+
+@pytest.mark.e2e
+def test_frontend_serves_html() -> None:
+    r = httpx.get("http://127.0.0.1:3000/", timeout=3)
+    assert r.status_code == 200
+    assert "<title>AlecaFrame</title>" in r.text
+
+
+@pytest.mark.e2e
+def test_frontend_proxies_api() -> None:
+    """Frontend nginx rewrites /api/ -> backend root."""
+    r = httpx.get("http://127.0.0.1:3000/api/healthz", timeout=3)
+    assert r.status_code == 200
+
+
+@pytest.mark.e2e
+def test_centrifugo_health() -> None:
+    """Centrifugo v6 /metrics returns 404 in this config.
+    Use POST /api/info with the API key instead — 200 means node is up."""
+    api_key = _centrifugo_api_key()
+    r = httpx.post(
+        "http://127.0.0.1:8002/api/info",
+        headers={"X-API-Key": api_key, "Content-Type": "application/json"},
+        content=b"{}",
+        timeout=3,
+    )
+    assert r.status_code == 200
+    assert "result" in r.json()
+
+
+@pytest.mark.e2e
+def test_rabbitmq_management() -> None:
+    r = httpx.get(
+        "http://127.0.0.1:15672/api/overview",
+        auth=("aleca", "aleca-local"), timeout=3,
+    )
+    assert r.status_code == 200
+    assert "rabbitmq_version" in r.json()
