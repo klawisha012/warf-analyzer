@@ -9,7 +9,6 @@ import logging
 import os
 import re
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -42,9 +41,6 @@ logging.basicConfig(
 log = logging.getLogger("alecaframe.main")
 
 # --------------------------------------------------------------------- paths
-
-_PROJECT_ROOT = Path(__file__).resolve().parents[2]
-_DEFAULT_DATA_DIR = _PROJECT_ROOT / "data"
 
 _settings = get_settings()
 DATA_DIR = _settings.data_dir

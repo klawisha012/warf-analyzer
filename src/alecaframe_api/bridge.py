@@ -16,7 +16,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
@@ -31,7 +31,7 @@ class BridgeError(RuntimeError):
 class CacheEntry:
     data: dict[str, Any]
     loaded_at: float  # monotonic seconds
-    source: str  # 'disk'
+    source: Literal["disk"]
 
 
 @dataclass
@@ -41,7 +41,7 @@ class AlecaBridge:
     agent_url: str
     data_dir: Path
     ttl_seconds: int = 60
-    refresh_timeout: float = 30.0
+    refresh_timeout: float = 10.0   # agent's pwsh cold-load is ~5s; 10s gives headroom
 
     _lastdata: CacheEntry | None = field(default=None, init=False, repr=False)
     _deltas: CacheEntry | None = field(default=None, init=False, repr=False)
@@ -114,7 +114,17 @@ class AlecaBridge:
         return (time.monotonic() - self._lastdata.loaded_at) > self.ttl_seconds
 
     def reload_from_disk(self, *, force: bool) -> None:
-        """Public so tests can pre-warm the cache without going through agent."""
+        """Reload cached entries from on-disk JSON.
+
+        Public so tests can pre-warm the cache and the lifespan can fall back
+        when the agent is offline. NOT thread-safe by itself: callers in async
+        contexts must hold `self._lock` (both `_ensure_loaded` and `refresh`
+        already do this). Synchronous test callers don't need to.
+
+        The `force` parameter is currently unused — kept to make the call sites
+        in `_ensure_loaded(force=True)` and `refresh()` (after a successful POST)
+        explicit and to allow future selective reload (e.g. only one file).
+        """
         now = time.monotonic()
         for attr, fname in (("_lastdata", "lastData.json"), ("_deltas", "deltas.json")):
             path = self.data_dir / fname
