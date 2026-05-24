@@ -2,10 +2,11 @@ name: alecaframe
 
 x-backend-env: &backend-env
   ALECA_AGENT_URL: ${ALECA_AGENT_URL:-http://host.docker.internal:8788}
-  ALECA_REDIS_URL: redis://redis:6379/0
-  ALECA_RABBITMQ_URL: amqp://aleca:aleca-local@rabbitmq:5672/
+  ALECA_REDIS_URL: ${ALECA_REDIS_URL:-redis://redis:6379/0}
+  ALECA_RABBITMQ_URL: ${ALECA_RABBITMQ_URL:-amqp://aleca:aleca-local@rabbitmq:5672/}
   ALECA_CENTRIFUGO_API: http://centrifugo:8000/api
   ALECA_CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:-local-dev-api-key-change-me}
+  ALECA_CENTRIFUGO_TOKEN_HMAC_SECRET: ${CENTRIFUGO_TOKEN_HMAC_SECRET:-local-dev-hmac-secret-change-me}
   ALECA_DATA_DIR: /data
   ALECA_TTL_SECONDS: ${ALECA_TTL_SECONDS:-60}
   ALECA_WFM_PLATFORM: ${ALECA_WFM_PLATFORM:-pc}
@@ -46,6 +47,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+      start_period: 30s
 
   centrifugo:
     image: centrifugo/centrifugo:v6
@@ -60,10 +62,15 @@ services:
     ulimits:
       nofile: { soft: 65536, hard: 65536 }
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "--header=X-API-Key: local-dev-api-key-change-me", "--post-data={}", "--header=Content-Type: application/json", "http://127.0.0.1:8000/api/info"]
+      test:
+        - "CMD"
+        - "sh"
+        - "-c"
+        - "wget -qO- --header=\"X-API-Key: $${CENTRIFUGO_HTTP_API_KEY}\" --post-data='{}' --header='Content-Type: application/json' http://127.0.0.1:8000/api/info >/dev/null"
       interval: 10s
       timeout: 3s
       retries: 6
+      start_period: 10s
 
 volumes:
   redis-data:

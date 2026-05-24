@@ -1,10 +1,11 @@
 {
+  "_NOTE": "Local-dev definitions for a loopback-only RabbitMQ. Plaintext password 'aleca-local' matches docker-compose RABBITMQ_DEFAULT_PASS and is also embedded in ALECA_RABBITMQ_URL in the anchor. If you ever expose this stack beyond 127.0.0.1, regenerate the credential and switch to password_hash + hashing_algorithm fields.",
   "rabbit_version": "4.0.0",
   "users": [
     {
       "name": "aleca",
       "password": "aleca-local",
-      "tags": "administrator"
+      "tags": ["administrator"]
     }
   ],
   "vhosts": [{ "name": "/" }],
