@@ -186,8 +186,10 @@ app = build_app()
 # ------------------------------------------------------------------ tray + runner
 
 
-def _make_tray_icon(stop_event: "asyncio.Event", out_dir: Path):
+def _make_tray_icon(out_dir: Path, host: str) -> "pystray.Icon":
     """Build a pystray icon. Returns the Icon instance (caller calls .run())."""
+    import urllib.request
+
     import pystray
     from PIL import Image, ImageDraw
 
@@ -198,17 +200,15 @@ def _make_tray_icon(stop_event: "asyncio.Event", out_dir: Path):
         os.startfile(str(out_dir))  # type: ignore[attr-defined]  # Windows only
 
     def _on_refresh(_icon, _item) -> None:
-        import urllib.request
         try:
             urllib.request.urlopen(
-                f"http://127.0.0.1:{os.getenv('AGENT_PORT', '8788')}/refresh",
+                f"http://{host}:{os.getenv('AGENT_PORT', '8788')}/refresh",
                 data=b"", timeout=30,
             )
         except Exception as e:
             log.warning("manual refresh failed: %s", e)
 
     def _on_quit(icon, _item) -> None:
-        stop_event.set()
         icon.stop()
 
     menu = pystray.Menu(
@@ -238,8 +238,6 @@ def run() -> None:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    stop_event = asyncio.Event()
-
     def _serve() -> None:
         uvicorn.run(app, host=host, port=port, log_level=os.getenv("AGENT_LOG_LEVEL", "info").lower())
 
@@ -255,5 +253,5 @@ def run() -> None:
             return
         return
 
-    icon = _make_tray_icon(stop_event, out_dir)
+    icon = _make_tray_icon(out_dir, host)
     icon.run()
