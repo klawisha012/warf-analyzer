@@ -125,3 +125,56 @@ async def test_request_returns_stale_if_5xx_and_cache_has_value(
     second = await c._request("GET", "/items", cache_key="items", cache_ttl=60, fresh=True)
     assert second["payload"]["items"][0]["url_name"] == "stale"
     assert second.get("_stale") is True
+
+
+@pytest.mark.asyncio
+async def test_get_items_returns_item_refs(client_factory, httpx_mock: HTTPXMock) -> None:
+    import json
+    from pathlib import Path
+    fixture = json.loads((Path(__file__).parent / "fixtures" / "wfm_items_sample.json").read_text(encoding="utf-8"))
+    httpx_mock.add_response(
+        url="https://mock.wfm.test/v1/items", method="GET", json=fixture,
+    )
+    c = client_factory()
+    items = await c.get_items()
+    assert len(items) == 6
+    kp = next(i for i in items if i.slug == "kronen_prime_blade")
+    assert kp.item_name == "Kronen Prime Blade"
+    assert kp.vaulted is True
+
+
+@pytest.mark.asyncio
+async def test_get_orders_returns_payload(client_factory, httpx_mock: HTTPXMock) -> None:
+    import json
+    from pathlib import Path
+    fixture = json.loads((Path(__file__).parent / "fixtures" / "wfm_orders_kronen_prime_blade.json").read_text(encoding="utf-8"))
+    httpx_mock.add_response(
+        url="https://mock.wfm.test/v1/items/kronen_prime_blade/orders", method="GET", json=fixture,
+    )
+    c = client_factory()
+    payload = await c.get_orders("kronen_prime_blade")
+    assert len(payload["payload"]["orders"]) == 10
+
+
+@pytest.mark.asyncio
+async def test_get_orders_includes_platform_param(client_factory, httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        url="https://mock.wfm.test/v1/items/kronen_prime_blade/orders?include=item",
+        method="GET", json={"payload": {"orders": []}},
+    )
+    c = client_factory()
+    await c.get_orders("kronen_prime_blade", include_item_info=True)
+    req = httpx_mock.get_request()
+    assert "include=item" in str(req.url)
+
+
+@pytest.mark.asyncio
+async def test_get_profile_orders_uses_username(client_factory, httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        url="https://mock.wfm.test/v1/profile/klawisha012/orders",
+        method="GET",
+        json={"payload": {"sell_orders": [], "buy_orders": []}},
+    )
+    c = client_factory()
+    payload = await c.get_profile_orders("klawisha012")
+    assert "sell_orders" in payload["payload"]

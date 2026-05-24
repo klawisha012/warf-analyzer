@@ -19,8 +19,15 @@ import httpx
 from aiolimiter import AsyncLimiter
 
 from alecaframe_api.infra.cache import Cache
+from alecaframe_api.wfm.slugs import ItemRef
 
 log = logging.getLogger("alecaframe.wfm.client")
+
+# Per-resource TTLs (seconds). Adjust if WFM rate limits or product needs change.
+_TTL_ITEMS = 24 * 3600       # 24h — catalogue is stable
+_TTL_ORDERS = 60             # 60s — order book churn
+_TTL_PROFILE = 300           # 5min
+_TTL_STATISTICS = 300        # 5min
 
 
 TokenProvider = Callable[[], Awaitable[str]]
@@ -108,3 +115,67 @@ class WFMClient:
 
         await self.cache.set_json(cache_key, payload, ttl_seconds=cache_ttl)
         return payload
+
+    # ----------------------------------------------------------- typed methods
+
+    async def get_items(self) -> list[ItemRef]:
+        payload = await self._request(
+            "GET", "/items",
+            cache_key="items",
+            cache_ttl=_TTL_ITEMS,
+        )
+        items = payload.get("payload", {}).get("items", [])
+        return [
+            ItemRef(
+                slug=it["url_name"],
+                item_name=it["item_name"],
+                thumb_url=it.get("thumb"),
+                vaulted=bool(it.get("vaulted", False)),
+                wfm_id=it["id"],
+            )
+            for it in items
+        ]
+
+    async def get_orders(
+        self,
+        slug: str,
+        *,
+        include_item_info: bool = False,
+        fresh: bool = False,
+    ) -> dict[str, Any]:
+        params = {"include": "item"} if include_item_info else None
+        return await self._request(
+            "GET",
+            f"/items/{slug}/orders",
+            cache_key=f"orders:{slug}:{int(include_item_info)}",
+            cache_ttl=_TTL_ORDERS,
+            fresh=fresh,
+            params=params,
+        )
+
+    async def get_profile(self, username: str, *, fresh: bool = False) -> dict[str, Any]:
+        return await self._request(
+            "GET",
+            f"/profile/{username}",
+            cache_key=f"profile:{username}",
+            cache_ttl=_TTL_PROFILE,
+            fresh=fresh,
+        )
+
+    async def get_profile_orders(self, username: str, *, fresh: bool = False) -> dict[str, Any]:
+        return await self._request(
+            "GET",
+            f"/profile/{username}/orders",
+            cache_key=f"profile-orders:{username}",
+            cache_ttl=_TTL_ORDERS,
+            fresh=fresh,
+        )
+
+    async def get_statistics(self, slug: str, *, fresh: bool = False) -> dict[str, Any]:
+        return await self._request(
+            "GET",
+            f"/items/{slug}/statistics",
+            cache_key=f"statistics:{slug}",
+            cache_ttl=_TTL_STATISTICS,
+            fresh=fresh,
+        )
