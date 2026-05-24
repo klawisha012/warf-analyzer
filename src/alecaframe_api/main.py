@@ -14,10 +14,18 @@ from typing import Annotated, Any
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 
+import redis.asyncio as redis_lib
+
 from . import __version__
 from .bridge import AlecaBridge, BridgeError
 from .config import get_settings
+from .infra.cache import Cache
 from .naming import NameResolver
+from .wfm import dependencies as wfm_deps
+from .wfm.client import WFMClient
+from .wfm.router import router as wfm_router
+from .wfm.sets import SetComposition, SetIndex
+from .wfm.slugs import SlugResolver
 from .schemas import (
     ApiInfo,
     Currencies,
@@ -67,14 +75,55 @@ async def lifespan(app: FastAPI):
         ttl_seconds=TTL_SECONDS,
     )
     resolver = NameResolver(ALECA_DATA_HOME / "cachedData" / "json")
-    # Backend MUST start cleanly even when the agent is offline. We prefer fresh
-    # data, but tolerate every failure mode.
+
+    # ----- WFM subsystem -----
+    redis_client = redis_lib.from_url(_settings.redis_url, decode_responses=True)
+    wfm_cache = Cache(client=redis_client, key_prefix="wfm")
+
+    async def _token_provider() -> str:
+        import httpx
+        async with httpx.AsyncClient(timeout=5.0) as c:
+            r = await c.get(f"{_settings.agent_url.rstrip('/')}/wfm-token")
+            r.raise_for_status()
+            return r.json()["token"]
+
+    wfm_client = WFMClient(
+        cache=wfm_cache, base_url=_settings.wfm_base_url,
+        token_provider=_token_provider, platform=_settings.wfm_platform,
+        language=_settings.wfm_language,
+        rate_limit_per_second=_settings.wfm_rate_limit_per_second,
+    )
+    slug_resolver = SlugResolver()
+    # Bootstrap slug catalogue (best-effort; if WFM is down we'll retry on first endpoint hit).
+    try:
+        items = await wfm_client.get_items()
+        slug_resolver.load(items)
+    except Exception as e:
+        log.warning("WFM /items bootstrap failed: %s; slug resolution will be empty until first /wfm/items call", e)
+
+    set_idx = SetIndex()
+    # Hardcoded seed set; B.2 will populate from AlecaFrame cachedData.
+    set_idx.register(SetComposition(
+        set_slug="kronen_prime_set", set_name="Kronen Prime Set",
+        parts={"kronen_prime_blade": 2, "kronen_prime_handle": 1, "kronen_prime_blueprint": 1},
+    ))
+
+    # Expose singletons to wfm/dependencies.
+    wfm_deps.wfm_client = wfm_client
+    wfm_deps.slug_resolver = slug_resolver
+    wfm_deps.set_index = set_idx
+
     try:
         await bridge.refresh()
     except BridgeError as e:
         log.warning("startup refresh failed (%s); reading whatever is on disk", e)
         bridge.reload_from_disk(force=True)
+
     yield
+
+    # Shutdown
+    await wfm_client.aclose()
+    await redis_client.aclose()
 
 
 app = FastAPI(
@@ -88,6 +137,8 @@ app = FastAPI(
     ),
     lifespan=lifespan,
 )
+
+app.include_router(wfm_router)
 
 # ---------------------------------------------------------- helpers / deps
 
