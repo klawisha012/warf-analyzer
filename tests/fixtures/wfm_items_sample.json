@@ -1,0 +1,12 @@
+{
+  "payload": {
+    "items": [
+      {"id": "54a73e1cc4442b15c5d80f6f", "url_name": "kronen_prime_blade",   "item_name": "Kronen Prime Blade",      "thumb": "/items/images/kronen_prime_blade.thumb.png", "vaulted": true},
+      {"id": "54a73e1cc4442b15c5d80f70", "url_name": "kronen_prime_blueprint", "item_name": "Kronen Prime Blueprint", "thumb": "/items/images/kronen_prime_blueprint.thumb.png", "vaulted": true},
+      {"id": "54a73e1cc4442b15c5d80f71", "url_name": "mag_prime_blueprint",   "item_name": "Mag Prime Blueprint",     "thumb": "/items/images/mag_prime_blueprint.thumb.png", "vaulted": false},
+      {"id": "54a73e1cc4442b15c5d80f72", "url_name": "volt_prime_helmet_blueprint", "item_name": "Volt Prime Helmet Blueprint", "thumb": "/items/images/volt_prime_helmet_blueprint.thumb.png", "vaulted": false},
+      {"id": "54a73e1cc4442b15c5d80f73", "url_name": "primed_continuity",    "item_name": "Primed Continuity",       "thumb": "/items/images/primed_continuity.thumb.png", "vaulted": false},
+      {"id": "54a73e1cc4442b15c5d80f74", "url_name": "ash_prime_systems_blueprint", "item_name": "Ash Prime Systems Blueprint", "thumb": "/items/images/ash_prime_systems_blueprint.thumb.png", "vaulted": false}
+    ]
+  }
+}
