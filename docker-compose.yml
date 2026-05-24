@@ -113,6 +113,22 @@ services:
       redis: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
 
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    container_name: aleca-frontend
+    restart: unless-stopped
+    ports: ["127.0.0.1:3000:80"]
+    depends_on:
+      backend: { condition: service_started }
+      centrifugo: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
 volumes:
   redis-data:
   rabbitmq-data:
