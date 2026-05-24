@@ -91,6 +91,23 @@ docker compose down
 # и Quit из tray-меню decrypt-agent
 ```
 
+## Frontend pages (B.1b)
+
+После `./scripts/start-stack.ps1` открой `http://127.0.0.1:3000`:
+
+| Route | Что показывает |
+|---|---|
+| `/` | Dashboard: Health/WFM-user/AlecaFrame-version + три виджета (Top WTB matches, Top set profits, Re-list nudges) |
+| `/inventory` | Сетка карточек инвентаря с фильтром по slot и поиском по имени |
+| `/prime-parts` | Таблица прайм-партов с min-qty фильтром и общим est. value |
+| `/sets` | Buildable сеты с фильтром min profit |
+
+Маршрутизация на `@solidjs/router`, fetching на `@tanstack/solid-query` (staleTime 30s, no refetch-on-focus).
+SPA fallback в nginx → каждый маршрут возвращает 200, клиент сам рендерит.
+
+При выключённом decrypt-agent dashboard покажет offline + empty-state в виджетах;
+прочие страницы покажут «No items» вместо crash.
+
 ## Разработка фронта вне docker
 
 В docker-compose фронт собран и отдаётся через nginx. Для быстрого
