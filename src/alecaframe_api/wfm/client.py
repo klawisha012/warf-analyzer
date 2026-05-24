@@ -91,15 +91,14 @@ class WFMClient:
             if cached is not None:
                 return cached
 
-        token = await self.token_provider()
-        headers = {
-            "Authorization": f"JWT {token}",
-            "Platform": self.platform,
-            "Language": self.language,
-            "Accept": "application/json",
-        }
-
         try:
+            token = await self.token_provider()
+            headers = {
+                "Authorization": f"JWT {token}",
+                "Platform": self.platform,
+                "Language": self.language,
+                "Accept": "application/json",
+            }
             async with self._limiter:
                 client = await self._client()
                 resp = await client.request(method, path, headers=headers, params=params)
