@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+build/
+dist/
+wheels/
+*.egg-info/
+.pytest_cache/
+
+# uv / venv
+.venv
+.python-version
+
+# Decrypted inventory cache (per-machine, may contain personal data)
+data/
+out/
+
+# IDE
+.vscode/
+.idea/
