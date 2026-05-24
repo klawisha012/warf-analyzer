@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # warframe.market specifics
+    wfm_base_url: str = "https://api.warframe.market/v1"
     wfm_platform: Platform = "pc"
     wfm_language: str = "en"
     wfm_rate_limit_per_second: int = 3
