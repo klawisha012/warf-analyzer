@@ -33,6 +33,8 @@ RUN useradd -m -u 1000 aleca \
 
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
+    # uv pre-compiled .pyc files at build time (UV_COMPILE_BYTECODE=1 in builder);
+    # this flag tells the interpreter never to scatter .pyc for any un-compiled module.
     PYTHONDONTWRITEBYTECODE=1 \
     ALECA_HOST=0.0.0.0
 
