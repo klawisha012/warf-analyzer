@@ -134,6 +134,18 @@ npm run dev   # vite на :5173, /api проксируется в backend
 - `GET /currencies` — Plat / Credits / Endo / Ducats / Trades / Gifts
 - `GET /standings` — daily affiliation по всем синдикатам
 
+### WFM market (B.1a)
+
+- `GET /wfm/items` — каталог slug-ов из warframe.market (24h cache)
+- `GET /wfm/orders/{slug}?include_offline=0&fresh=0` — текущий order book с агрегациями (min/median/percentiles/spread/volume)
+- `GET /wfm/profile/{user}` — репутация и статус
+- `GET /me/listings` — твои активные WTS/WTB
+- `GET /me/inventory-priced?slot=warframe|primary|secondary|melee|all&limit=50` — инвентарь с медианной ценой и spread
+- `GET /me/prime-parts-priced?min_count=1` — расширение `/prime-parts` с ценами + Vaulted-флаг
+- `GET /me/sets-profit?min_margin=0` — buildable сеты + cost-to-complete + profit
+- `GET /me/wtb-matches?min_offer=10` — WTB-ордера на items, которые у тебя есть
+- `GET /me/relist-nudges` — listings, выпавшие из топ-5 / ниже медианы
+
 ### Списки инвентаря
 
 - `GET /warframes` — Suits
