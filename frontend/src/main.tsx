@@ -3,22 +3,44 @@ import { render } from "solid-js/web";
 import { lazy } from "solid-js";
 import { Router, Route } from "@solidjs/router";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
+import { persistQueryClient } from "@tanstack/query-persist-client-core";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 
 import Layout from "./components/Layout";
 import "./styles.css";
+import { version as appVersion } from "../package.json";
 
 const Dashboard  = lazy(() => import("./routes/Dashboard"));
 const Inventory  = lazy(() => import("./routes/Inventory"));
 const PrimeParts = lazy(() => import("./routes/PrimeParts"));
 const Sets       = lazy(() => import("./routes/Sets"));
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
+      gcTime: ONE_DAY_MS,
       refetchOnWindowFocus: false,
       retry: 1,
     },
+  },
+});
+
+const persister = createSyncStoragePersister({
+  storage: window.localStorage,
+  key: "alecaframe-query-cache",
+});
+
+persistQueryClient({
+  queryClient,
+  persister,
+  maxAge: ONE_DAY_MS,
+  buster: appVersion,
+  dehydrateOptions: {
+    shouldDehydrateQuery: (query) =>
+      query.queryKey[0] !== "healthz" && query.state.status === "success",
   },
 });
 
