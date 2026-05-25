@@ -86,6 +86,7 @@ export const en = {
     watchlist:       "Watchlist",
     watchlistEmpty:  "Add a weapon to start tracking",
     watchlistAddPlaceholder: "Weapon slug (e.g. tonkor)",
+    searchPlaceholder: "Search weapons (Tonkor, Bramma…)",
     watchlistAdd:    "Add",
     watchlistRemove: "×",
     selectWeapon:    "Pick a weapon from the list on the left",

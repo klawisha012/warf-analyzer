@@ -87,6 +87,7 @@ export const ru = {
     watchlist:       "Отслеживаемые",
     watchlistEmpty:  "Добавь оружие, чтобы начать отслеживание",
     watchlistAddPlaceholder: "Slug оружия (напр. tonkor)",
+    searchPlaceholder: "Поиск оружия (Tonkor, Bramma…)",
     watchlistAdd:    "Добавить",
     watchlistRemove: "×",
     selectWeapon:    "Выбери оружие в списке слева",

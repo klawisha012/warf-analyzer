@@ -4,7 +4,7 @@ import Card from "../components/Card";
 import Badge from "../components/Badge";
 import EmptyState from "../components/EmptyState";
 import { fetchers, keys } from "../api/queries";
-import { fmtPlat, prettySlug, wfmUrl } from "../lib/format";
+import { fmtPlat, prettySlug } from "../lib/format";
 import { useRivenAlerts } from "../hooks/useRivenAlerts";
 import { alertCountByWeapon } from "../lib/rivenAlerts";
 import { t, locale } from "../i18n";
@@ -14,17 +14,25 @@ import type {
   RivenStrategyTip,
   RivenTierStats,
   RivenTopAttribute,
+  RivenWeapon,
 } from "../api/types";
 
 export default function Rivens() {
   const qc = useQueryClient();
   const [selected, setSelected] = createSignal<string | null>(null);
-  const [addInput, setAddInput] = createSignal("");
 
   const watchlist = createQuery(() => ({
     queryKey: keys.rivenWatchlist(),
     queryFn:  fetchers.rivenWatchlist,
     refetchInterval: 30_000,
+  }));
+
+  // WFM riven-capable weapons catalogue — 24h cache on the backend, so the
+  // first request lights it up and every subsequent search hits the cache.
+  const catalogue = createQuery(() => ({
+    queryKey: keys.rivenWeapons(),
+    queryFn:  fetchers.rivenWeapons,
+    staleTime: 24 * 60 * 60 * 1000,
   }));
 
   // Auto-select first weapon when the watchlist loads.
@@ -36,13 +44,12 @@ export default function Rivens() {
   // Subscribe to every watched weapon's alert channel.
   useRivenAlerts(() => (watchlist.data?.items ?? []).map((w) => w.weapon_slug));
 
-  async function add() {
-    const slug = addInput().trim().toLowerCase().replace(/\s+/g, "_");
-    if (!slug) return;
-    await fetchers.rivenWatchAdd(slug);
-    setAddInput("");
+  async function addBySlug(slug: string) {
+    const clean = slug.trim().toLowerCase();
+    if (!clean) return;
+    await fetchers.rivenWatchAdd(clean);
     await qc.invalidateQueries({ queryKey: keys.rivenWatchlist() });
-    setSelected(slug);
+    setSelected(clean);
   }
 
   async function remove(slug: string) {
@@ -57,22 +64,22 @@ export default function Rivens() {
         <h1 class="text-2xl font-bold">{t("rivens.title")}</h1>
       </header>
 
-      <div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
+      <div class="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4">
         <WatchlistPanel
-          items={(watchlist.data?.items ?? []).map((w) => w.weapon_slug)}
+          watched={(watchlist.data?.items ?? []).map((w) => w.weapon_slug)}
+          weapons={catalogue.data?.items ?? []}
+          catalogueLoading={catalogue.isLoading}
           selected={selected()}
           onSelect={setSelected}
           onRemove={remove}
-          addInput={addInput()}
-          setAddInput={setAddInput}
-          onAdd={add}
+          onAdd={addBySlug}
         />
 
         <Show
           when={selected()}
           fallback={<Card><EmptyState title={t("rivens.selectWeapon")} hint="" /></Card>}
         >
-          <WeaponView slug={selected()!} />
+          <WeaponView slug={selected()!} weapon={catalogue.data?.items.find((w) => w.slug === selected())} />
         </Show>
       </div>
     </div>
@@ -82,69 +89,125 @@ export default function Rivens() {
 // -------------------------------------------------------------- Watchlist
 
 function WatchlistPanel(p: {
-  items: string[];
+  watched: string[];
+  weapons: RivenWeapon[];
+  catalogueLoading: boolean;
   selected: string | null;
   onSelect: (s: string) => void;
   onRemove: (s: string) => void;
-  addInput: string;
-  setAddInput: (v: string) => void;
-  onAdd: () => void;
+  onAdd: (slug: string) => void | Promise<void>;
 }) {
   const counts = createMemo(() => alertCountByWeapon());
+  const watchedSet = createMemo(() => new Set(p.watched));
+  const [query, setQuery] = createSignal("");
+  const [open, setOpen] = createSignal(false);
+
+  const matches = createMemo(() => {
+    const q = query().trim().toLowerCase();
+    if (!q) return [];
+    const all = p.weapons.filter((w) => !watchedSet().has(w.slug));
+    // Match either the display name or the slug substring.
+    const scored = all
+      .map((w) => {
+        const name = (w.item_name || "").toLowerCase();
+        const slug = (w.slug || "").toLowerCase();
+        const nameIdx = name.indexOf(q);
+        const slugIdx = slug.indexOf(q);
+        if (nameIdx === -1 && slugIdx === -1) return null;
+        // Earlier match in the name ranks higher; slug-only match ranks lowest.
+        const score = nameIdx === -1 ? 1000 + slugIdx : nameIdx;
+        return { w, score };
+      })
+      .filter((r): r is { w: RivenWeapon; score: number } => r !== null)
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 8)
+      .map((r) => r.w);
+    return scored;
+  });
+
+  async function pick(w: RivenWeapon) {
+    setQuery("");
+    setOpen(false);
+    await p.onAdd(w.slug);
+  }
+
   return (
     <Card title={t("rivens.watchlist")}>
-      <form
-        class="flex gap-2 mb-3"
-        onSubmit={(e) => { e.preventDefault(); p.onAdd(); }}
-      >
+      <div class="relative mb-3">
         <input
           type="text"
-          value={p.addInput}
-          onInput={(e) => p.setAddInput(e.currentTarget.value)}
-          placeholder={t("rivens.watchlistAddPlaceholder")}
-          class="flex-1 px-2 py-1 text-sm rounded-md bg-slate-900 border border-slate-800 text-slate-100"
+          value={query()}
+          onInput={(e) => { setQuery(e.currentTarget.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder={p.catalogueLoading ? t("common.loading") : t("rivens.searchPlaceholder")}
+          disabled={p.catalogueLoading}
+          class="w-full px-2 py-1 text-sm rounded-md bg-slate-900 border border-slate-800 text-slate-100 disabled:opacity-50"
         />
-        <button
-          type="submit"
-          class="px-3 py-1 text-sm rounded-md bg-slate-800 hover:bg-slate-700 text-slate-100"
-        >
-          {t("rivens.watchlistAdd")}
-        </button>
-      </form>
+        <Show when={open() && matches().length > 0}>
+          <ul class="absolute z-20 mt-1 w-full max-h-72 overflow-auto rounded-md border border-slate-800 bg-slate-950 shadow-xl">
+            <For each={matches()}>
+              {(w) => (
+                <li>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); pick(w); }}
+                    class="w-full flex items-center justify-between gap-2 px-2 py-1 text-left text-sm hover:bg-slate-800"
+                  >
+                    <span class="flex flex-col">
+                      <span class="text-slate-100">{w.item_name}</span>
+                      <span class="text-xs text-slate-500 font-mono">{w.slug}</span>
+                    </span>
+                    <Show when={w.disposition != null}>
+                      <span class="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 font-mono">
+                        {t("rivens.disposition")} {w.disposition!.toFixed(2)}
+                      </span>
+                    </Show>
+                  </button>
+                </li>
+              )}
+            </For>
+          </ul>
+        </Show>
+      </div>
+
       <Show
-        when={p.items.length > 0}
+        when={p.watched.length > 0}
         fallback={<div class="text-sm text-slate-500">{t("rivens.watchlistEmpty")}</div>}
       >
         <ul class="space-y-1">
-          <For each={p.items}>
-            {(slug) => (
-              <li>
-                <button
-                  type="button"
-                  onClick={() => p.onSelect(slug)}
-                  class="w-full flex items-center justify-between gap-2 px-2 py-1 rounded text-left text-sm transition-colors"
-                  classList={{
-                    "bg-slate-800 text-slate-100": p.selected === slug,
-                    "text-slate-300 hover:bg-slate-900": p.selected !== slug,
-                  }}
-                >
-                  <span class="truncate">{prettySlug(slug)}</span>
-                  <span class="flex items-center gap-1">
-                    <Show when={(counts()[slug] ?? 0) > 0}>
-                      <Badge variant="good">{counts()[slug]}</Badge>
-                    </Show>
-                    <span
-                      role="button"
-                      tabindex="0"
-                      class="text-slate-500 hover:text-rose-400 px-1"
-                      onClick={(e) => { e.stopPropagation(); p.onRemove(slug); }}
-                    >
-                      {t("rivens.watchlistRemove")}
+          <For each={p.watched}>
+            {(slug) => {
+              const meta = p.weapons.find((w) => w.slug === slug);
+              return (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => p.onSelect(slug)}
+                    class="w-full flex items-center justify-between gap-2 px-2 py-1 rounded text-left text-sm transition-colors"
+                    classList={{
+                      "bg-slate-800 text-slate-100": p.selected === slug,
+                      "text-slate-300 hover:bg-slate-900": p.selected !== slug,
+                    }}
+                  >
+                    <span class="truncate">{meta?.item_name ?? prettySlug(slug)}</span>
+                    <span class="flex items-center gap-1">
+                      <Show when={(counts()[slug] ?? 0) > 0}>
+                        <Badge variant="good">{counts()[slug]}</Badge>
+                      </Show>
+                      <span
+                        role="button"
+                        tabindex="0"
+                        class="text-slate-500 hover:text-rose-400 px-1"
+                        onClick={(e) => { e.stopPropagation(); p.onRemove(slug); }}
+                      >
+                        {t("rivens.watchlistRemove")}
+                      </span>
                     </span>
-                  </span>
-                </button>
-              </li>
-            )}
+                  </button>
+                </li>
+              );
+            }}
           </For>
         </ul>
       </Show>
@@ -154,7 +217,7 @@ function WatchlistPanel(p: {
 
 // -------------------------------------------------------------- WeaponView
 
-function WeaponView(p: { slug: string }) {
+function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
   const auctions = createQuery(() => ({
     queryKey: keys.rivenAuctions(p.slug),
     queryFn:  () => fetchers.rivenAuctions(p.slug),
@@ -168,8 +231,13 @@ function WeaponView(p: { slug: string }) {
 
   return (
     <div class="space-y-4">
-      <header class="flex items-baseline gap-3">
-        <h2 class="text-xl font-semibold text-slate-100">{prettySlug(p.slug)}</h2>
+      <header class="flex items-baseline gap-3 flex-wrap">
+        <h2 class="text-xl font-semibold text-slate-100">{p.weapon?.item_name ?? prettySlug(p.slug)}</h2>
+        <Show when={p.weapon?.disposition != null}>
+          <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-amber-300 font-mono">
+            {t("rivens.disposition")} {p.weapon!.disposition!.toFixed(2)}
+          </span>
+        </Show>
         <a
           href={`https://warframe.market/auctions/search?type=riven&weapon_url_name=${encodeURIComponent(p.slug)}`}
           target="_blank"
@@ -429,8 +497,3 @@ function HistorySparkline(props: { rows: { ts: number; median: number | null }[]
 function prettyAttr(name: string): string {
   return name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
-
-function _href(slug: string): string {
-  return wfmUrl(slug);
-}
-void _href;
