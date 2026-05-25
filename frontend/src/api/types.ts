@@ -52,6 +52,12 @@ export type OrderBookResponse = {
   top_orders: OrderRow[];
 };
 
+export type ItemUse = {
+  name: string;
+  unique_name: string;
+  count: number;
+};
+
 export type PricedItem = {
   unique_name: string;
   name: string;
@@ -64,6 +70,7 @@ export type PricedItem = {
   buy_max: number | null;
   estimated_value: number | null;
   stale: boolean;
+  used_in: ItemUse[];
 };
 
 export type PricedItemListResponse = {

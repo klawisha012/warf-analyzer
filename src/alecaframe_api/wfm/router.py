@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from alecaframe_api.bridge import AlecaBridge, BridgeError
 from alecaframe_api.naming import NameResolver
 from alecaframe_api.schemas import (
+    ItemUseRef,
     OrderBookResponse, OrderBookStatsModel, OrderRow,
     PricedItemEntry, PricedItemListResponse,
     RelistNudgeResponse, RelistNudgeRow,
@@ -43,6 +44,11 @@ def _get_bridge() -> AlecaBridge:
 def _get_resolver() -> NameResolver:
     from alecaframe_api.main import resolver  # noqa: PLC0415
     return resolver
+
+
+def _get_recipe_uses() -> dict[str, list]:
+    from alecaframe_api.main import recipe_uses_idx  # noqa: PLC0415
+    return recipe_uses_idx
 
 
 BridgeDep = Annotated[AlecaBridge, Depends(_get_bridge)]
@@ -228,6 +234,7 @@ async def me_inventory_priced(
     else:
         raw_items = list(data.get(section_map[slot]) or [])
 
+    recipe_uses = _get_recipe_uses()
     enriched: list[PricedItemEntry] = []
     seen_slugs: set[str] = set()
     for it in raw_items[:limit]:
@@ -253,12 +260,21 @@ async def me_inventory_priced(
                 buy_max = buy.max_price
             except WFMError:
                 pass
+        used_in = [
+            ItemUseRef(
+                name=use.result_name,
+                unique_name=use.result_unique_name,
+                count=use.count_required,
+            )
+            for use in recipe_uses.get(u, [])
+        ]
         enriched.append(PricedItemEntry(
             unique_name=u, name=name, slug=slug,
             count=it.get("ItemCount"), vaulted=vaulted,
             sell_min=sell_min, sell_median=sell_median, sell_spread=sell_spread,
             buy_max=buy_max,
             estimated_value=(sell_median * (it.get("ItemCount") or 1)) if sell_median else None,
+            used_in=used_in,
         ))
 
     return PricedItemListResponse(total=len(enriched), returned=len(enriched), items=enriched)

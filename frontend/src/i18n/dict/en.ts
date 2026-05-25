@@ -34,10 +34,11 @@ export const en = {
     rep:                "rep",
   },
   inventory: {
-    title:            "Inventory",
-    empty:            "No items",
-    emptyHint:        "Try a different slot or clear the filter.",
-    builtNotCraftable: "Built — not craftable",
+    title:         "Inventory",
+    empty:         "No items",
+    emptyHint:     "Try a different slot or clear the filter.",
+    usedIn:        "Used in:",
+    finalProduct:  "Final product",
     slot: {
       warframe:  "warframe",
       primary:   "primary",

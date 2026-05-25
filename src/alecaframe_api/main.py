@@ -33,6 +33,7 @@ from .wfm.sets import SetComposition, SetIndex
 from .wfm.slugs import SlugResolver
 from .db.repo import Repo
 from .wfm.history_router import router as history_router
+from .wfm.recipe_uses import RecipeUse, load_recipe_uses
 from .wfm.sets_loader import load_set_compositions_from_aleca
 from .schemas import (
     ApiInfo,
@@ -79,11 +80,12 @@ ALECA_DATA_HOME = _settings.aleca_data_home or DATA_DIR
 bridge: AlecaBridge
 resolver: NameResolver
 repo: Repo | None = None
+recipe_uses_idx: dict[str, list[RecipeUse]] = {}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global bridge, resolver
+    global bridge, resolver, recipe_uses_idx
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     bridge = AlecaBridge(
         agent_url=AGENT_URL,
@@ -91,6 +93,9 @@ async def lifespan(app: FastAPI):
         ttl_seconds=TTL_SECONDS,
     )
     resolver = NameResolver(ALECA_DATA_HOME / "cachedData" / "json")
+    recipe_uses_idx = load_recipe_uses(
+        cached_json_dir=ALECA_DATA_HOME / "cachedData" / "json",
+    )
 
     # ----- WFM subsystem -----
     redis_client = redis_lib.from_url(_settings.redis_url, decode_responses=True)

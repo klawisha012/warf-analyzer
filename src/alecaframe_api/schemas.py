@@ -138,6 +138,13 @@ class OrderBookResponse(BaseModel):
     top_orders: list[OrderRow] = Field(default_factory=list)
 
 
+class ItemUseRef(BaseModel):
+    """An item that uses some other item as a component in its recipe."""
+    name: str
+    unique_name: str
+    count: int
+
+
 class PricedItemEntry(BaseModel):
     unique_name: str
     name: str
@@ -150,6 +157,7 @@ class PricedItemEntry(BaseModel):
     buy_max: int | None = None
     estimated_value: int | None = None
     stale: bool = False
+    used_in: list[ItemUseRef] = []
 
 
 class PricedItemListResponse(BaseModel):
