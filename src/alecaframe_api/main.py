@@ -31,6 +31,9 @@ from .wfm.consumer import handle_live_order
 from .wfm.me_router import router as me_router
 from .wfm.sets import SetComposition, SetIndex
 from .wfm.slugs import SlugResolver
+from .db.repo import Repo
+from .wfm.history_router import router as history_router
+from .wfm.sets_loader import load_set_compositions_from_aleca
 from .schemas import (
     ApiInfo,
     Currencies,
@@ -68,6 +71,7 @@ ALECA_DATA_HOME = _settings.aleca_data_home or (DATA_DIR / "cachedData" / "json"
 
 bridge: AlecaBridge
 resolver: NameResolver
+repo: Repo | None = None
 
 
 @asynccontextmanager
@@ -113,10 +117,38 @@ async def lifespan(app: FastAPI):
         parts={"kronen_prime_blade": 2, "kronen_prime_handle": 1, "kronen_prime_blueprint": 1},
     ))
 
+    # ----- DB + sets loader -----
+    global repo
+    repo = Repo(db_path=_settings.sqlite_path)
+    await repo.connect()
+    # Persisted set_compositions table — populate from AlecaFrame cachedData if empty.
+    existing = await repo.read_set_compositions()
+    if not existing:
+        try:
+            loaded = load_set_compositions_from_aleca(
+                cached_json_dir=ALECA_DATA_HOME / "cachedData" / "json",
+                resolver=slug_resolver,
+            )
+            for comp in loaded:
+                for part_slug, qty in comp.parts.items():
+                    await repo.upsert_set_composition(comp.set_slug, part_slug, qty)
+                set_idx.register(comp)
+            log.info("loaded %d set compositions from AlecaFrame cachedData", len(loaded))
+        except Exception as e:
+            log.warning("set composition load failed: %s", e)
+    else:
+        # Use DB copy. set_name is lost (not stored), so fall back to slug.
+        for row in existing:
+            set_idx.register(SetComposition(
+                set_slug=row["set_slug"], set_name=row["set_slug"], parts=row["parts"],
+            ))
+        log.info("loaded %d set compositions from DB", len(existing))
+
     # Expose singletons to wfm/dependencies.
     wfm_deps.wfm_client = wfm_client
     wfm_deps.slug_resolver = slug_resolver
     wfm_deps.set_index = set_idx
+    wfm_deps.repo = repo
 
     # ----- Real-time subsystem -----
     centrifugo = CentrifugoPublisher(
@@ -128,7 +160,7 @@ async def lifespan(app: FastAPI):
     _consumer_subscribed = {"v": False}
 
     async def _on_live_order(msg: dict) -> None:
-        await handle_live_order(msg=msg, cache=wfm_cache, publisher=centrifugo)
+        await handle_live_order(msg=msg, cache=wfm_cache, publisher=centrifugo, repo=repo)
 
     async def _try_subscribe() -> bool:
         try:
@@ -167,6 +199,8 @@ async def lifespan(app: FastAPI):
     # Shutdown
     await wfm_client.aclose()
     await bus.aclose()
+    if repo is not None:
+        await repo.close()
     await redis_client.aclose()
 
 
@@ -184,6 +218,7 @@ app = FastAPI(
 
 app.include_router(wfm_router)
 app.include_router(me_router)
+app.include_router(history_router)
 
 # ---------------------------------------------------------- helpers / deps
 
