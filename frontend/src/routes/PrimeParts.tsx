@@ -69,7 +69,6 @@ export default function PrimeParts() {
                   <tr class="border-b border-slate-800">
                     <th class="py-2 px-3">{t("primeParts.col.item")}</th>
                     <th class="py-2 px-3 text-right">{t("primeParts.col.qty")}</th>
-                    <th class="py-2 px-3">{t("primeParts.col.status")}</th>
                     <th class="py-2 px-3">{t("primeParts.col.sell")}</th>
                     <th class="py-2 px-3 text-right">{t("primeParts.col.buyMax")}</th>
                     <th class="py-2 px-3 text-right">{t("primeParts.col.estValue")}</th>

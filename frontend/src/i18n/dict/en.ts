@@ -14,7 +14,6 @@ export const en = {
     online:   "online",
     offline:  "offline",
     vaulted:  "vaulted",
-    stale:    "stale",
     filter:   "Filter…",
     dash:     "—",
   },
@@ -59,7 +58,6 @@ export const en = {
     col: {
       item:     "Item",
       qty:      "Qty",
-      status:   "Status",
       sell:     "Sell",
       buyMax:   "Buy max",
       estValue: "Est. value",
@@ -81,8 +79,6 @@ export const en = {
     sellMin:     "Sell min",
     buyMax:      "Buy max",
     estValue:    "Est. value",
-    minPrefix:   "min",
-    spread:      "spread",
   },
   langToggle: {
     label: "Language",

@@ -346,14 +346,15 @@ async def me_inventory_priced(
             )
             for use in recipe_uses.get(u, [])
         ]
+        sell_min = stats.sell_min if stats else None
         enriched.append(PricedItemEntry(
             unique_name=u, name=name, slug=slug,
             count=it.get("ItemCount"), vaulted=vaulted,
-            sell_min=stats.sell_min if stats else None,
+            sell_min=sell_min,
             sell_median=sell_median,
             sell_spread=stats.sell_spread if stats else None,
             buy_max=stats.buy_max if stats else None,
-            estimated_value=(sell_median * (it.get("ItemCount") or 1)) if sell_median else None,
+            estimated_value=(sell_min * (it.get("ItemCount") or 1)) if sell_min else None,
             stale=bool(stats.stale) if stats else False,
             used_in=used_in,
         ))
@@ -397,14 +398,14 @@ async def me_prime_parts_priced(
         stats = prices.get(slug) if slug else None
         ref = slug_resolver.by_slug(slug) if slug else None
         vaulted = ref.vaulted if ref else None
-        sell_median = stats.sell_median if stats else None
+        sell_min = stats.sell_min if stats else None
         rows.append(PricedItemEntry(
             unique_name=u, name=name, slug=slug, count=count, vaulted=vaulted,
-            sell_min=stats.sell_min if stats else None,
-            sell_median=sell_median,
+            sell_min=sell_min,
+            sell_median=stats.sell_median if stats else None,
             sell_spread=stats.sell_spread if stats else None,
             buy_max=stats.buy_max if stats else None,
-            estimated_value=(sell_median * count) if sell_median else None,
+            estimated_value=(sell_min * count) if sell_min else None,
             stale=bool(stats.stale) if stats else False,
         ))
 

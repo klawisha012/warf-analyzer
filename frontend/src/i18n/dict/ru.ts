@@ -15,7 +15,6 @@ export const ru = {
     online:   "онлайн",
     offline:  "офлайн",
     vaulted:  "vaulted",  // game-term, оставляем
-    stale:    "устарело",
     filter:   "Фильтр…",
     dash:     "—",
   },
@@ -60,7 +59,6 @@ export const ru = {
     col: {
       item:     "Предмет",
       qty:      "Кол-во",
-      status:   "Статус",
       sell:     "Продажа",
       buyMax:   "Покупка макс.",
       estValue: "Оценка",
@@ -82,8 +80,6 @@ export const ru = {
     sellMin:     "Мин. продажа",
     buyMax:      "Макс. покупка",
     estValue:    "Оценка",
-    minPrefix:   "мин.",
-    spread:      "разброс",
   },
   langToggle: {
     label: "Язык",

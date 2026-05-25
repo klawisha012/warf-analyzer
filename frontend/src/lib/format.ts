@@ -23,11 +23,6 @@ export function fmtRelTime(iso: string | null | undefined): string {
   return `${d}d ago`;
 }
 
-export function spreadPct(min: number | null, median: number | null): number | null {
-  if (min == null || median == null || median === 0) return null;
-  return Math.round(((median - min) / median) * 100);
-}
-
 /** `kronen_prime_handle` → `Kronen Prime Handle`. */
 export function prettySlug(slug: string): string {
   return slug
