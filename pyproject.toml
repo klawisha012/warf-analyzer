@@ -4,14 +4,18 @@ version = "0.1.0"
 description = "Off-line FastAPI backend for AlecaFrame Warframe inventory."
 requires-python = ">=3.12"
 dependencies = [
+    "aio-pika>=9.5",
     "aiolimiter>=1.2",
+    "apscheduler>=3.10",
     "fastapi>=0.136.3",
     "httpx>=0.28",
     "pillow>=12.2.0",
     "pydantic-settings>=2.14.1",
+    "pyjwt>=2.9",
     "pystray>=0.19.5; sys_platform == 'win32'",
     "redis>=5.2",
     "uvicorn[standard]>=0.48.0",
+    "websockets>=14.1",
     "win10toast-click>=0.1.2; sys_platform == 'win32'",
 ]
 
