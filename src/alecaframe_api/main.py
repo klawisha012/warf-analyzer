@@ -62,10 +62,17 @@ _settings = get_settings()
 DATA_DIR = _settings.data_dir
 TTL_SECONDS = _settings.ttl_seconds
 AGENT_URL = _settings.agent_url
-# Static name DB still comes from the host (it ships with AlecaFrame).
-# When backend runs in a container the engineer mounts it as /data/cachedData/json
-# (handled by docker-compose in Task 9).
-ALECA_DATA_HOME = _settings.aleca_data_home or (DATA_DIR / "cachedData" / "json").parent
+# Static name DB ships with AlecaFrame on the host. Two ways to reach it:
+#   1. ALECA_DATA_HOME env var pointing at .../AlecaFrame (the directory that
+#      contains cachedData/json/) — set by docker-compose to /aleca-data when
+#      it bind-mounts ${ALECA_DATA_HOME_HOST}.
+#   2. Fallback to DATA_DIR (containers without the mount get a graceful empty
+#      catalogue + warning rather than a corrupted /data/cachedData/cachedData
+#      path).
+# The previous default of `(DATA_DIR / "cachedData" / "json").parent` produced
+# /data/cachedData which then got "cachedData/json" appended again — double
+# segment, never resolved on disk.
+ALECA_DATA_HOME = _settings.aleca_data_home or DATA_DIR
 
 # ----------------------------------------------------------------- lifespan
 

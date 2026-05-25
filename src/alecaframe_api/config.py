@@ -9,6 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Platform = Literal["pc", "xbox", "ps4", "switch"]
@@ -40,7 +41,10 @@ class Settings(BaseSettings):
     # filesystem
     data_dir: Path = Path("/data")
     sqlite_path: Path = Path("/data/wfm_history.db")
-    aleca_data_home: Path | None = None  # set by agent on host, unset in container
+    # `env_prefix="ALECA_"` would otherwise turn this field into
+    # `ALECA_ALECA_DATA_HOME`. Override the alias so the public env var is the
+    # intuitive `ALECA_DATA_HOME` (matches what docker-compose sets).
+    aleca_data_home: Path | None = Field(default=None, validation_alias="ALECA_DATA_HOME")
 
     # behaviour
     ttl_seconds: int = 60

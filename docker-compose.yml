@@ -8,6 +8,10 @@ x-backend-env: &backend-env
   ALECA_CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:-local-dev-api-key-change-me}
   ALECA_CENTRIFUGO_TOKEN_HMAC_SECRET: ${CENTRIFUGO_TOKEN_HMAC_SECRET:-local-dev-hmac-secret-change-me-do-not-use-in-prod-or-with-real-data}
   ALECA_DATA_DIR: /data
+  # AlecaFrame's host directory is bind-mounted into the container at
+  # /aleca-data (see backend.volumes); the path itself is set on the host
+  # via ALECA_DATA_HOME_HOST. sets_loader + NameResolver read from here.
+  ALECA_DATA_HOME: /aleca-data
   ALECA_TTL_SECONDS: ${ALECA_TTL_SECONDS:-60}
   ALECA_WFM_PLATFORM: ${ALECA_WFM_PLATFORM:-pc}
   ALECA_LOG_LEVEL: ${ALECA_LOG_LEVEL:-INFO}
@@ -83,6 +87,12 @@ services:
       <<: *backend-env
     volumes:
       - ./data:/data
+      # AlecaFrame cachedData (Warframes.json, Primary.json, ...) mounted ro.
+      # ALECA_DATA_HOME_HOST in .env points at the host dir (e.g.
+      # %LOCALAPPDATA%/AlecaFrame on Windows). Fallback to ./data so missing
+      # env var doesn't break docker compose up; loader logs a warning and
+      # falls through to the hardcoded seed.
+      - ${ALECA_DATA_HOME_HOST:-./data}:/aleca-data:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -107,6 +117,7 @@ services:
       <<: *backend-env
     volumes:
       - ./data:/data:ro
+      - ${ALECA_DATA_HOME_HOST:-./data}:/aleca-data:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
