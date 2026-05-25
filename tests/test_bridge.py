@@ -53,3 +53,50 @@ async def test_lastdata_works_offline_if_disk_has_file(tmp_data_dir: Path) -> No
     br = AlecaBridge(agent_url="http://nope.invalid", data_dir=tmp_data_dir)
     data = await br.lastdata()
     assert "PremiumCredits" in data
+
+
+@pytest.mark.asyncio
+async def test_lastdata_unwraps_mission_completion_wrapper(tmp_path: Path) -> None:
+    """If lastData.json is a mission-completion wrapper, the bridge unwraps InventoryJson.
+
+    AlecaFrame's lastData.dat can hold post-mission events whose payload nests
+    the real inventory as a JSON-string under the InventoryJson key.
+    """
+    import json
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    real_inventory = {
+        "PremiumCredits": 169,
+        "RegularCredits": 32_539_253,
+        "Suits": [{"ItemType": "/Lotus/Powersuits/Cowgirl/MesaPrime", "XP": 1}],
+        "MiscItems": [{"ItemType": "/Lotus/Types/Items/Misc/Rubedo", "ItemCount": 10000}],
+        "Recipes": [],
+    }
+    wrapper = {
+        "InventoryChanges": {},
+        "MissionRewards": [],
+        "TotalCredits": [],
+        "InventoryJson": json.dumps(real_inventory),
+    }
+    (data_dir / "lastData.json").write_text(json.dumps(wrapper), encoding="utf-8")
+    (data_dir / "_meta.json").write_text('{"meta":{"wfm_username":"x"}}', encoding="utf-8")
+
+    br = AlecaBridge(agent_url="http://agent.invalid", data_dir=data_dir)
+    br.reload_from_disk(force=True)
+    data = await br.lastdata()
+    # We get the unwrapped 173-key shape, not the 4-key wrapper.
+    assert data["PremiumCredits"] == 169
+    assert len(data["Suits"]) == 1
+    assert len(data["MiscItems"]) == 1
+    assert "InventoryJson" not in data  # wrapper key gone after unwrap
+
+
+@pytest.mark.asyncio
+async def test_lastdata_passes_through_when_not_wrapped(tmp_data_dir: Path) -> None:
+    """Direct 173-key inventory (no InventoryJson) is returned as-is."""
+    br = AlecaBridge(agent_url="http://agent.invalid", data_dir=tmp_data_dir)
+    br.reload_from_disk(force=True)
+    data = await br.lastdata()
+    # tmp_data_dir fixture writes a direct-shape lastData.json with PremiumCredits at top.
+    assert "InventoryJson" not in data
+    assert data["PremiumCredits"] == 169

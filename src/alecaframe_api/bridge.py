@@ -27,6 +27,45 @@ class BridgeError(RuntimeError):
     """Raised when /refresh fails or files cannot be loaded."""
 
 
+def _unwrap_inventory_if_wrapped(data: dict[str, Any], *, path: Path | None = None) -> dict[str, Any]:
+    """Detect AlecaFrame's mission-completion wrapper and return the unwrapped inventory.
+
+    AlecaFrame's `lastData.dat` can hold two different DE-API responses depending
+    on when the .dat was last written:
+
+    1. **Full inventory pull** (`/api/inventory.php`) — 173 top-level keys directly:
+       `Suits`, `MiscItems`, `Recipes`, `DailyAffiliation*`, etc. The 17 inventory
+       endpoints expect this shape.
+
+    2. **Mission completion event** (`/api/missionInventoryUpdate.php`) — wrapper
+       with 8 keys: `InventoryChanges`, `MissionRewards`, `TotalCredits`,
+       `CreditsBonus`, `MissionCredits`, `GuildVault*`, and crucially
+       `InventoryJson` (string) containing the FULL post-mission inventory
+       JSON-encoded as a single string field.
+
+    When we see the wrapper, we parse `InventoryJson` and use it as the actual
+    inventory. The mission-side metadata is currently unused; if a future endpoint
+    needs `MissionRewards` we'll surface it separately.
+    """
+    if not isinstance(data, dict):
+        return data
+    raw_inventory_json = data.get("InventoryJson")
+    if not isinstance(raw_inventory_json, str) or not raw_inventory_json:
+        return data
+    try:
+        unwrapped = json.loads(raw_inventory_json)
+    except Exception as e:
+        log.warning("InventoryJson present in %s but unparseable: %s", path, e)
+        return data
+    if not isinstance(unwrapped, dict):
+        return data
+    log.info(
+        "unwrapped mission-completion lastData wrapper: %d → %d top-level keys (from %s)",
+        len(data), len(unwrapped), path,
+    )
+    return unwrapped
+
+
 @dataclass
 class CacheEntry:
     data: dict[str, Any]
@@ -135,6 +174,8 @@ class AlecaBridge:
             except Exception as e:
                 log.warning("failed to parse %s: %s", path, e)
                 continue
+            if attr == "_lastdata":
+                data = _unwrap_inventory_if_wrapped(data, path=path)
             setattr(self, attr, CacheEntry(data=data, loaded_at=now, source="disk"))
         meta_path = self.data_dir / "_meta.json"
         if meta_path.exists():
