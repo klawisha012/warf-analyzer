@@ -49,13 +49,16 @@ class WFMSocketClient:
                 url = f"{self._base_ws}?platform={self._platform}"
                 headers = {"Cookie": f"JWT={token}; platform={self._platform}"}
                 async with websockets.connect(url, additional_headers=headers, ping_interval=20) as ws:
-                    backoff = 1.0
+                    connected_at = asyncio.get_event_loop().time()
                     # Subscribe to current slug set.
                     for slug in list(self._slugs):
                         await ws.send(json.dumps({
                             "type": "@WS/SUBSCRIBE/NEW_ORDERS", "payload": slug,
                         }))
                     async for raw in ws:
+                        if backoff != 1.0 and (asyncio.get_event_loop().time() - connected_at) > 30:
+                            # Stable for 30s — safe to reset backoff.
+                            backoff = 1.0
                         try:
                             msg = json.loads(raw)
                         except Exception:
