@@ -5,6 +5,7 @@ Run with:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
@@ -124,14 +125,36 @@ async def lifespan(app: FastAPI):
         token_hmac_secret=_settings.centrifugo_token_hmac_secret,
     )
     bus = RabbitMQBus(url=_settings.rabbitmq_url)
-    try:
-        await bus.connect()
-    except Exception as e:
-        log.warning("RabbitMQ connect failed at startup: %s; consumer disabled", e)
+    _consumer_subscribed = {"v": False}
+
+    async def _on_live_order(msg: dict) -> None:
+        await handle_live_order(msg=msg, cache=wfm_cache, publisher=centrifugo)
+
+    async def _try_subscribe() -> bool:
+        try:
+            await bus.connect()
+            if not _consumer_subscribed["v"]:
+                await bus.subscribe("wfm.live.orders", _on_live_order)
+                _consumer_subscribed["v"] = True
+            return True
+        except Exception as e:
+            log.warning("RabbitMQ connect failed: %s", e)
+            return False
+
+    # Try a few times at startup
+    for attempt in range(3):
+        if await _try_subscribe():
+            break
+        await asyncio.sleep(5)
     else:
-        async def _on_live_order(msg: dict) -> None:
-            await handle_live_order(msg=msg, cache=wfm_cache, publisher=centrifugo)
-        await bus.subscribe("wfm.live.orders", _on_live_order)
+        log.warning("RabbitMQ unreachable after 3 attempts; scheduling background retry every 60s")
+        async def _retry_loop() -> None:
+            while not _consumer_subscribed["v"]:
+                await asyncio.sleep(60)
+                if await _try_subscribe():
+                    log.info("RabbitMQ connected on retry; consumer live")
+                    break
+        asyncio.create_task(_retry_loop())
 
     try:
         await bridge.refresh()
