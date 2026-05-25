@@ -108,6 +108,24 @@ SPA fallback в nginx → каждый маршрут возвращает 200, 
 При выключённом decrypt-agent dashboard покажет offline + empty-state в виджетах;
 прочие страницы покажут «No items» вместо crash.
 
+## Real-time channels (B.1c)
+
+Frontend подписывается на `wfm.orders.{slug}` для top-10 видимых items на каждой странице.
+Бэкенд consumer'ит RabbitMQ `wfm.live.orders` (durable queue), poller продюсит туда
+WFM-WS события, бэкенд invalidate-ит Redis-кеш и публикует в Centrifugo.
+
+Каналы:
+| Канал | Кто publish | Кто sub |
+|---|---|---|
+| `wfm.orders.{slug}` | backend consumer | frontend pages |
+| `system.refresh` | (B.2+) | frontend Dashboard |
+| `alert.{rule_id}` | (B.3) | frontend |
+
+Auth: backend минтит JWT (`POST /api/me/centrifugo-token`), Centrifugo проверяет HMAC.
+
+При выключённой RabbitMQ backend стартует с warning, live-updates не работают, но REST
+работает как раньше.
+
 ## Разработка фронта вне docker
 
 В docker-compose фронт собран и отдаётся через nginx. Для быстрого
