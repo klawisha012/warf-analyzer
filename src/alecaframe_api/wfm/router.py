@@ -6,6 +6,7 @@ populated by main.py's lifespan. Heavy lifting lives in `wfm/prices.py`,
 """
 from __future__ import annotations
 
+import asyncio
 import datetime as _dt
 import logging
 from typing import Annotated, Any
@@ -285,19 +286,30 @@ async def me_prime_parts_priced(
             if t.startswith("/Lotus/Types/Recipes/") and "Prime" in t:
                 agg[t] = agg.get(t, 0) + int(it.get("ItemCount", 1) or 0)
 
+    # Resolve slugs first, then parallel-fetch orders for each known slug.
+    eligible = [(u, count) for u, count in agg.items() if count >= min_count]
+    slugs_for: dict[str, str | None] = {u: slug_resolver.resolve_unique_name(u) for u, _ in eligible}
+
+    async def _fetch_orders(slug: str | None) -> list[dict] | None:
+        if not slug:
+            return None
+        try:
+            payload = await client.get_orders(slug)
+            return payload.get("data") or []
+        except WFMError:
+            return None
+
+    fetch_results = await asyncio.gather(*[_fetch_orders(slugs_for[u]) for u, _ in eligible])
+
     rows: list[PricedItemEntry] = []
-    for u, count in agg.items():
-        if count < min_count:
-            continue
-        slug = slug_resolver.resolve_unique_name(u)
+    for (u, count), orders in zip(eligible, fetch_results):
+        slug = slugs_for[u]
         name = (rs.lookup(u) or {}).get("name") or rs.resolve(u)
         sell_min, sell_median, sell_spread, buy_max, vaulted = None, None, None, None, None
         if slug:
             ref = slug_resolver.by_slug(slug)
             vaulted = ref.vaulted if ref else None
-            try:
-                payload = await client.get_orders(slug)
-                orders = payload.get("data") or []
+            if orders is not None:
                 sell = compute_stats(orders, side="sell", online_only=True)
                 buy = compute_stats(orders, side="buy", online_only=True)
                 sell_min, sell_median = sell.min_price, sell.median
@@ -307,8 +319,6 @@ async def me_prime_parts_priced(
                     else None
                 )
                 buy_max = buy.max_price
-            except WFMError:
-                pass
         rows.append(PricedItemEntry(
             unique_name=u, name=name, slug=slug, count=count, vaulted=vaulted,
             sell_min=sell_min, sell_median=sell_median, sell_spread=sell_spread,
@@ -344,14 +354,21 @@ async def me_sets_profit(
             if slug:
                 inv_by_slug[slug] = inv_by_slug.get(slug, 0) + int(it.get("ItemCount", 1) or 0)
 
-    # Fetch floor for every needed slug + every full-set slug.
+    # Fetch floor for every needed slug + every full-set slug — in parallel.
+    # The WFMClient's AsyncLimiter throttles to ~3 req/s; gather just queues
+    # them, turning N × 333ms sequential into ceil(N/3) × 333ms wall time.
     needed: set[str] = set()
     for comp in set_index.all_sets():
         needed.update(comp.parts.keys())
         needed.add(comp.set_slug)
+    needed_list = list(needed)
+    floor_results = await asyncio.gather(
+        *[_floor_for(client, s, online_only=True) for s in needed_list],
+        return_exceptions=True,
+    )
     floors: dict[str, int | None] = {}
-    for slug in needed:
-        floors[slug] = await _floor_for(client, slug, online_only=True)
+    for slug, res in zip(needed_list, floor_results):
+        floors[slug] = None if isinstance(res, BaseException) else res
 
     part_floors = {s: v for s, v in floors.items() if s in {p for c in set_index.all_sets() for p in c.parts}}
     set_floors = {c.set_slug: floors.get(c.set_slug) for c in set_index.all_sets()}
@@ -389,13 +406,21 @@ async def me_wtb_matches(
             if slug:
                 inv_by_slug[slug] = inv_by_slug.get(slug, 0) + int(it.get("ItemCount", 1) or 0)
 
-    matches: list[WtbMatchRow] = []
-    for slug, qty in inv_by_slug.items():
+    # Parallel fetch — AsyncLimiter handles pacing inside WFMClient.
+    async def _fetch(slug: str) -> tuple[str, list[dict] | None]:
         try:
             payload = await client.get_orders(slug)
         except WFMError:
+            return slug, None
+        return slug, payload.get("data") or []
+
+    slug_payloads = await asyncio.gather(*[_fetch(s) for s in inv_by_slug.keys()])
+
+    matches: list[WtbMatchRow] = []
+    for slug, orders in slug_payloads:
+        if orders is None:
             continue
-        orders = payload.get("data") or []
+        qty = inv_by_slug[slug]
         ref = slug_resolver.by_slug(slug)
         for o in orders:
             user = o.get("user") or {}

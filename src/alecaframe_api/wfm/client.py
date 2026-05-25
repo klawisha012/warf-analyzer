@@ -11,7 +11,11 @@ the `_request` plumbing and types only.
 """
 from __future__ import annotations
 
+import asyncio
+import base64
+import json
 import logging
+import time as _time
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
@@ -51,6 +55,12 @@ class WFMClient:
 
     _limiter: AsyncLimiter = field(init=False, repr=False)
     _http: httpx.AsyncClient | None = field(default=None, init=False, repr=False)
+    # JWT cache so concurrent callers don't all hammer decrypt-agent's
+    # /wfm-token endpoint. Refreshed when within 30s of expiry; lock dedupes
+    # parallel misses.
+    _cached_token: str | None = field(default=None, init=False, repr=False)
+    _token_expires_at: float = field(default=0.0, init=False, repr=False)
+    _token_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self._limiter = AsyncLimiter(max_rate=self.rate_limit_per_second, time_period=1.0)
@@ -73,6 +83,23 @@ class WFMClient:
             await self._http.aclose()
             self._http = None
 
+    # ----------------------------------------------------------- auth
+
+    async def _get_token(self) -> str:
+        """Cached JWT accessor. Refreshes 30s before expiry; concurrent-safe."""
+        now = _time.time()
+        if self._cached_token and self._token_expires_at - now > 30:
+            return self._cached_token
+        async with self._token_lock:
+            # Re-check under lock: a concurrent caller may have just refreshed.
+            now = _time.time()
+            if self._cached_token and self._token_expires_at - now > 30:
+                return self._cached_token
+            token = await self.token_provider()
+            self._cached_token = token
+            self._token_expires_at = _extract_jwt_exp(token, default_ttl=300)
+            return token
+
     # ----------------------------------------------------------- request
 
     async def _request(
@@ -92,7 +119,7 @@ class WFMClient:
                 return cached
 
         try:
-            token = await self.token_provider()
+            token = await self._get_token()
             headers = {
                 "Authorization": f"JWT {token}",
                 "Platform": self.platform,
@@ -203,3 +230,30 @@ class WFMClient:
             "WFM /items/{slug}/statistics not available in v2; use the "
             "B.2a SQLite history table via /history/{slug} instead."
         )
+
+
+# --------------------------------------------------------------- jwt helpers
+
+
+def _extract_jwt_exp(token: str, *, default_ttl: int) -> float:
+    """Read the `exp` claim from a JWT without verifying its signature.
+
+    decrypt-agent is the local trusted minter, so signature verification adds
+    no value here — we only need the expiry to decide when to refresh.
+    Returns a Unix timestamp; falls back to now + default_ttl on any parse
+    failure so a malformed token still gets cached briefly instead of being
+    re-fetched on every call.
+    """
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return _time.time() + default_ttl
+        # JWT uses URL-safe base64 without padding; restore it.
+        payload_b64 = parts[1] + "=" * (-len(parts[1]) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        exp = payload.get("exp")
+        if isinstance(exp, (int, float)) and exp > 0:
+            return float(exp)
+    except Exception as e:
+        log.warning("can't parse JWT exp (%s); using default TTL", e)
+    return _time.time() + default_ttl

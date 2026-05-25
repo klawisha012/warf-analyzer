@@ -178,3 +178,102 @@ async def test_get_profile_orders_raises_until_v2_migrated(client_factory) -> No
     c = client_factory()
     with pytest.raises(WFMError, match="not migrated to v2"):
         await c.get_profile_orders("klawisha012")
+
+
+@pytest.mark.asyncio
+async def test_token_provider_called_once_across_concurrent_requests(
+    cache: Cache, httpx_mock: HTTPXMock,
+) -> None:
+    """Regression: 50 parallel WFM calls must NOT trigger 50 token fetches.
+
+    Before the fix every `_request` called `token_provider()` directly, which
+    in production hammered decrypt-agent's /wfm-token at the rate of WFM
+    requests. The cache + lock should serialise refresh to one fetch even
+    under high concurrency.
+    """
+    import asyncio
+    import base64
+    import json
+    import time as _time
+
+    call_count = {"n": 0}
+    # Build a JWT with a far-future exp so the cache stays warm for the run.
+    payload = {"exp": int(_time.time()) + 3600}
+    payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=").decode()
+    token = f"header.{payload_b64}.signature"
+
+    async def counting_provider() -> str:
+        call_count["n"] += 1
+        return token
+
+    httpx_mock.add_response(
+        url="https://mock.wfm.test/v2/orders/item/some_slug",
+        method="GET",
+        json={"apiVersion": "0.23.1", "data": []},
+        is_reusable=True,
+    )
+    c = WFMClient(
+        cache=cache, base_url="https://mock.wfm.test/v2",
+        token_provider=counting_provider, platform="pc", language="en",
+        rate_limit_per_second=100,
+    )
+    # 20 concurrent get_orders, all with fresh=True so cache doesn't short-circuit.
+    await asyncio.gather(*[c.get_orders(f"some_slug", fresh=True) for _ in range(20)])
+
+    assert call_count["n"] == 1, f"expected 1 token fetch, got {call_count['n']}"
+
+
+@pytest.mark.asyncio
+async def test_token_refreshed_when_expired(cache: Cache, httpx_mock: HTTPXMock) -> None:
+    """When the cached JWT is within 30s of expiry, refresh must fire again."""
+    import base64
+    import json
+    import time as _time
+
+    call_count = {"n": 0}
+
+    def _make_token(exp: int) -> str:
+        payload_b64 = base64.urlsafe_b64encode(
+            json.dumps({"exp": exp}).encode()
+        ).rstrip(b"=").decode()
+        return f"header.{payload_b64}.signature"
+
+    async def provider() -> str:
+        call_count["n"] += 1
+        # First call: token expiring in 5s (well within the 30s refresh window).
+        # Second call: fresh token expiring in 1h.
+        return _make_token(int(_time.time()) + (5 if call_count["n"] == 1 else 3600))
+
+    httpx_mock.add_response(
+        url="https://mock.wfm.test/v2/orders/item/x", method="GET",
+        json={"apiVersion": "0.23.1", "data": []}, is_reusable=True,
+    )
+    c = WFMClient(
+        cache=cache, base_url="https://mock.wfm.test/v2",
+        token_provider=provider, platform="pc", language="en",
+        rate_limit_per_second=100,
+    )
+    await c.get_orders("x", fresh=True)
+    await c.get_orders("x", fresh=True)
+    assert call_count["n"] == 2  # first cached <30s exp, second refresh
+
+
+def test_extract_jwt_exp_round_trip() -> None:
+    import base64
+    import json
+    import time as _time
+    from alecaframe_api.wfm.client import _extract_jwt_exp
+
+    exp = int(_time.time()) + 600
+    payload_b64 = base64.urlsafe_b64encode(json.dumps({"exp": exp}).encode()).rstrip(b"=").decode()
+    token = f"hdr.{payload_b64}.sig"
+    assert _extract_jwt_exp(token, default_ttl=10) == float(exp)
+
+
+def test_extract_jwt_exp_falls_back_on_malformed() -> None:
+    import time as _time
+    from alecaframe_api.wfm.client import _extract_jwt_exp
+
+    now = _time.time()
+    out = _extract_jwt_exp("not-a-jwt", default_ttl=42)
+    assert now <= out <= now + 50
