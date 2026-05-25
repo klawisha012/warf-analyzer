@@ -25,7 +25,7 @@ async def repo(tmp_path: Path) -> Repo:
 @pytest.mark.asyncio
 async def test_write_snapshot_writes_4_rows(repo: Repo) -> None:
     """One snapshot writes (sell, buy) × (online_only=1, =0) = 4 rows."""
-    orders = json.loads(FIXTURE.read_text(encoding="utf-8"))["payload"]["orders"]
+    orders = json.loads(FIXTURE.read_text(encoding="utf-8"))["data"]
     ts = int(time.time())
     await write_snapshot(repo=repo, slug="kronen_prime_blade", orders=orders, ts=ts)
     # Verify 4 keys: sell-online, sell-all, buy-online, buy-all.
@@ -48,7 +48,7 @@ async def test_write_snapshot_writes_4_rows(repo: Repo) -> None:
 @pytest.mark.asyncio
 async def test_write_snapshot_idempotent_at_same_ts(repo: Repo) -> None:
     """INSERT OR REPLACE means same ts produces same row count."""
-    orders = json.loads(FIXTURE.read_text(encoding="utf-8"))["payload"]["orders"]
+    orders = json.loads(FIXTURE.read_text(encoding="utf-8"))["data"]
     ts = int(time.time())
     await write_snapshot(repo=repo, slug="kronen_prime_blade", orders=orders, ts=ts)
     await write_snapshot(repo=repo, slug="kronen_prime_blade", orders=orders, ts=ts)

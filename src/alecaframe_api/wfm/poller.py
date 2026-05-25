@@ -147,7 +147,8 @@ async def _main() -> None:
         for slug in list(socket_client._slugs)[:20]:   # cap to stay under rate limit
             try:
                 payload = await wfm_client.get_orders(slug)
-                orders = (payload.get("payload") or {}).get("orders") or []
+                # WFM v2 returns {"apiVersion", "data": [...]} (was payload.orders in v1).
+                orders = payload.get("data") or []
                 await write_snapshot(repo=poller_repo, slug=slug, orders=orders)
             except Exception as e:
                 log.warning("snapshot for %s failed: %s", slug, e)
