@@ -24,7 +24,7 @@ export default function SetRowComp(props: { row: SetProfitRow }) {
         </div>
         <Badge variant={profitVariant() as never}>{t("sets.profitBadge", { plat: fmtPlat(props.row.profit) })}</Badge>
       </header>
-      <dl class="grid grid-cols-3 gap-2 text-sm mb-2">
+      <dl class="grid grid-cols-2 gap-2 text-sm mb-2">
         <div>
           <dt class="text-slate-400 text-xs">{t("sets.setPrice")}</dt>
           <dd class="font-mono text-slate-100">{fmtPlat(props.row.set_price)}</dd>
@@ -32,10 +32,6 @@ export default function SetRowComp(props: { row: SetProfitRow }) {
         <div>
           <dt class="text-slate-400 text-xs">{t("sets.partsCost")}</dt>
           <dd class="font-mono text-slate-100">{fmtPlat(props.row.parts_cost)}</dd>
-        </div>
-        <div>
-          <dt class="text-slate-400 text-xs">{t("sets.taxEst")}</dt>
-          <dd class="font-mono text-slate-300">{fmtPlat(props.row.tax_estimate)}</dd>
         </div>
       </dl>
       <Show when={missing().length > 0}>

@@ -13,13 +13,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-# WFM trade tax: 1% of plat traded + ducats. As a first approximation we
-# model it as 0.1p per part times the number of parts in the set, rounded up.
-def _tax_estimate(parts_count: int) -> int:
-    raw = 0.1 * parts_count
-    # Always at least 1p — WFM takes a minimum cut and we don't want to
-    # over-promise profit by 0.4p.
-    return max(1, int(round(raw)))
+# Tax is no longer subtracted from set-build profit — at small parts counts
+# the 0.1p/part heuristic was producing a flat 1p that distorted profit
+# readings more than it informed them. We keep the field at 0 in the schema
+# for compatibility with any external consumer that still reads it.
 
 
 @dataclass(frozen=True)
@@ -89,15 +86,13 @@ def compute_set_profits(
                 assert floor is not None  # checked above
                 cost += need * floor
 
-        total_parts = sum(comp.parts.values())
-        tax = _tax_estimate(total_parts)
-        profit = set_price - cost - tax
+        profit = set_price - cost
         if profit < min_margin:
             continue
 
         rows.append(SetProfitRow(
             set_slug=comp.set_slug, set_name=comp.set_name,
-            set_price=set_price, parts_cost=cost, tax_estimate=tax,
+            set_price=set_price, parts_cost=cost, tax_estimate=0,
             profit=profit, missing_parts=missing, owned_parts=owned,
         ))
 

@@ -72,7 +72,6 @@ export const en = {
     emptyHint:   "Either set seeds aren't loaded (B.2) or the market doesn't open a gap right now.",
     setPrice:    "Set price",
     partsCost:   "Parts cost",
-    taxEst:      "Tax (est.)",
     profitBadge: "+{{plat}} profit",
     toBuy:       "To buy:",
   },

@@ -47,8 +47,9 @@ def test_compute_set_profits_buyable_and_owned(index: SetIndex) -> None:
 
     Sell price for the whole set = 100p (provided externally).
     Floor prices: blade=35, handle=20, bp=24.
-    Tax: 0.1p per part = 0.5p ~ 1p rounded up via max(1, ...).
-    Cost = 2*35 + 1*20 = 90. Sell = 100. Profit = 100 - 90 - 1 = 9.
+    Tax is no longer deducted (it was always a flat 1p and distorted readings
+    at small parts counts more than it informed them).
+    Cost = 2*35 + 1*20 = 90. Sell = 100. Profit = 100 - 90 = 10.
     """
     inventory_counts = {
         "kronen_prime_handle": 1,
@@ -70,8 +71,8 @@ def test_compute_set_profits_buyable_and_owned(index: SetIndex) -> None:
     kronen = next(r for r in rows if r.set_slug == "kronen_prime_set")
     assert kronen.set_price == 100
     assert kronen.parts_cost == 90     # 2 blades @35 + 1 handle @20
-    assert kronen.tax_estimate == 1
-    assert kronen.profit == 100 - 90 - 1
+    assert kronen.tax_estimate == 0
+    assert kronen.profit == 100 - 90
     assert kronen.missing_parts == {"kronen_prime_blade": 2, "kronen_prime_handle": 1}
 
 

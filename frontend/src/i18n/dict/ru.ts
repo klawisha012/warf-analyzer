@@ -73,7 +73,6 @@ export const ru = {
     emptyHint:   "Либо seed'ы сетов не загружены (B.2), либо рынок не даёт окна прибыли.",
     setPrice:    "Цена сета",
     partsCost:   "Стоимость частей",
-    taxEst:      "Налог (оц.)",
     profitBadge: "+{{plat}} прибыль",
     toBuy:       "Докупить:",
   },
