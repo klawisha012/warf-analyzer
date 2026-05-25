@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     centrifugo_api: str = "http://centrifugo:8000/api"
     centrifugo_api_key: str = "change-me-in-env"
     centrifugo_token_hmac_secret: str = "change-me-in-env"
+    centrifugo_token_ttl_seconds: int = 3600
 
     # filesystem
     data_dir: Path = Path("/data")
