@@ -120,8 +120,13 @@ class WFMClient:
 
         try:
             token = await self._get_token()
+            # v2 switched from the v1 `JWT <token>` scheme to standard
+            # `Bearer <token>` (RFC 6750). v1's scheme is silently accepted
+            # on public endpoints like /v2/orders/item/{slug} (no auth check),
+            # so the breakage only showed up on /v2/me + /v2/me/orders where
+            # it returned 401 Unauthorized.
             headers = {
-                "Authorization": f"JWT {token}",
+                "Authorization": f"Bearer {token}",
                 "Platform": self.platform,
                 "Language": self.language,
                 "Accept": "application/json",

@@ -53,7 +53,8 @@ async def test_request_sends_jwt_header(client_factory, httpx_mock: HTTPXMock) -
     c = client_factory()
     await c._request("GET", "/items", cache_key="items", cache_ttl=10)
     req = httpx_mock.get_request()
-    assert req.headers["Authorization"] == "JWT FAKE.JWT.TOKEN"
+    # v2 uses Bearer (was JWT in v1) — RFC 6750 standard scheme.
+    assert req.headers["Authorization"] == "Bearer FAKE.JWT.TOKEN"
     assert req.headers["Language"] == "en"
     assert req.headers["Platform"] == "pc"
 
