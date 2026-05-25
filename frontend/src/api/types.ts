@@ -79,6 +79,13 @@ export type PricedItemListResponse = {
   items: PricedItem[];
 };
 
+export type RefreshResponse = {
+  ok: boolean;
+  files: Record<string, unknown>;
+  meta: Record<string, unknown>;
+  elapsed_ms: number | null;
+};
+
 export type RelistNudge = {
   slug: string;
   item_name: string;

@@ -6,6 +6,9 @@ export const ru = {
     inventory:  "Инвентарь",
     primeParts: "Prime-парты",
     sets:       "Сеты",
+    refresh:        "Обновить",
+    refreshing:     "Обновляю…",
+    refreshFailed:  "Ошибка обновления",
   },
   common: {
     loading:  "Загрузка…",

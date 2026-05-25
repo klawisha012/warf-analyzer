@@ -1,5 +1,7 @@
-import type { JSX } from "solid-js";
+import { createSignal, type JSX } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
+import { useQueryClient } from "@tanstack/solid-query";
+import { fetchers } from "../api/queries";
 import { t, locale, setLocale } from "../i18n";
 
 type LayoutProps = { children?: JSX.Element };
@@ -13,6 +15,25 @@ const NAV = [
 
 export default function Layout(props: LayoutProps) {
   const loc = useLocation();
+  const qc = useQueryClient();
+  const [state, setState] = createSignal<"idle" | "pending" | "error">("idle");
+
+  async function handleRefresh() {
+    if (state() === "pending") return;
+    setState("pending");
+    try {
+      await fetchers.refresh();
+      // Every /me/* query reads bridge.lastdata() — invalidate them all so
+      // they refetch the freshly-decrypted inventory snapshot.
+      await qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "me" });
+      setState("idle");
+    } catch (e) {
+      console.warn("refresh failed:", e);
+      setState("error");
+      setTimeout(() => setState("idle"), 3000);
+    }
+  }
+
   return (
     <div class="min-h-screen text-slate-100 bg-slate-950">
       <header class="sticky top-0 z-10 bg-slate-950/80 backdrop-blur border-b border-slate-800">
@@ -32,8 +53,26 @@ export default function Layout(props: LayoutProps) {
               {t(item.key)}
             </A>
           ))}
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={state() === "pending"}
+            class="ml-auto px-3 py-1.5 rounded-lg text-sm border transition-colors disabled:cursor-wait"
+            classList={{
+              "border-slate-800 text-slate-300 hover:text-slate-100 hover:bg-slate-900": state() === "idle",
+              "border-slate-700 text-slate-500": state() === "pending",
+              "border-red-900 text-red-400": state() === "error",
+            }}
+            aria-label={t("nav.refresh")}
+          >
+            {state() === "pending"
+              ? t("nav.refreshing")
+              : state() === "error"
+                ? t("nav.refreshFailed")
+                : t("nav.refresh")}
+          </button>
           <div
-            class="ml-auto flex items-center gap-0.5 rounded-md border border-slate-800 p-0.5"
+            class="ml-2 flex items-center gap-0.5 rounded-md border border-slate-800 p-0.5"
             role="group"
             aria-label={t("langToggle.label")}
           >

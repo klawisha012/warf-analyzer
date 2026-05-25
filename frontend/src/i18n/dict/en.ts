@@ -5,6 +5,9 @@ export const en = {
     inventory:  "Inventory",
     primeParts: "Prime Parts",
     sets:       "Sets",
+    refresh:        "Refresh",
+    refreshing:     "Refreshing…",
+    refreshFailed:  "Refresh failed",
   },
   common: {
     loading:  "Loading…",
