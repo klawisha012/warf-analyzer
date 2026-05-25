@@ -111,10 +111,13 @@ async def lifespan(app: FastAPI):
         log.warning("WFM /items bootstrap failed: %s; slug resolution will be empty until first /wfm/items call", e)
 
     set_idx = SetIndex()
-    # Hardcoded seed set; B.2 will populate from AlecaFrame cachedData.
+    # Hardcoded fallback seed when neither DB nor AlecaFrame cachedData provides
+    # set compositions. Quantities match WFM v2 `quantityInSet` per part:
+    #   kronen_prime_blade=2, kronen_prime_handle=2, kronen_prime_blueprint=1.
+    # (Previous seed had handle=1, which under-counted missing parts by one.)
     set_idx.register(SetComposition(
         set_slug="kronen_prime_set", set_name="Kronen Prime Set",
-        parts={"kronen_prime_blade": 2, "kronen_prime_handle": 1, "kronen_prime_blueprint": 1},
+        parts={"kronen_prime_blade": 2, "kronen_prime_handle": 2, "kronen_prime_blueprint": 1},
     ))
 
     # ----- DB + sets loader -----

@@ -8,13 +8,18 @@ from alecaframe_api.wfm.sets import SetIndex, SetComposition, compute_set_profit
 
 @pytest.fixture
 def index() -> SetIndex:
+    """Test catalogue with REAL WFM v2 `quantityInSet` values per part.
+
+    Kronen Prime Set: 2 blades + 2 handles + 1 blueprint (5 parts total).
+    Source: api.warframe.market/v2/items/{slug}.quantityInSet.
+    """
     idx = SetIndex()
     idx.register(SetComposition(
         set_slug="kronen_prime_set",
         set_name="Kronen Prime Set",
         parts={
             "kronen_prime_blade": 2,
-            "kronen_prime_handle": 1,
+            "kronen_prime_handle": 2,
             "kronen_prime_blueprint": 1,
         },
     ))
@@ -34,16 +39,16 @@ def index() -> SetIndex:
 def test_register_and_lookup(index: SetIndex) -> None:
     s = index.get("kronen_prime_set")
     assert s is not None and s.set_name == "Kronen Prime Set"
-    assert sum(s.parts.values()) == 4  # 2 blades + 1 handle + 1 blueprint
+    assert sum(s.parts.values()) == 5  # 2 blades + 2 handles + 1 blueprint
 
 
 def test_compute_set_profits_buyable_and_owned(index: SetIndex) -> None:
-    """User owns 1 of each Kronen part except blades; needs to buy 2 blades.
+    """User owns 1 handle + 1 blueprint; needs 2 blades + 1 more handle.
 
     Sell price for the whole set = 100p (provided externally).
     Floor prices: blade=35, handle=20, bp=24.
-    Tax: 0.1p per part = 0.4p ~ 1p rounded.
-    Cost to complete = 2*35 = 70. Sell = 100. Profit = 100 - 70 - 1 = 29.
+    Tax: 0.1p per part = 0.5p ~ 1p rounded up via max(1, ...).
+    Cost = 2*35 + 1*20 = 90. Sell = 100. Profit = 100 - 90 - 1 = 9.
     """
     inventory_counts = {
         "kronen_prime_handle": 1,
@@ -64,10 +69,36 @@ def test_compute_set_profits_buyable_and_owned(index: SetIndex) -> None:
 
     kronen = next(r for r in rows if r.set_slug == "kronen_prime_set")
     assert kronen.set_price == 100
-    assert kronen.parts_cost == 70    # buy 2 blades @35 each
-    assert kronen.tax_estimate == 1   # rounded from 0.4
-    assert kronen.profit == 100 - 70 - 1
-    assert kronen.missing_parts == {"kronen_prime_blade": 2}
+    assert kronen.parts_cost == 90     # 2 blades @35 + 1 handle @20
+    assert kronen.tax_estimate == 1
+    assert kronen.profit == 100 - 90 - 1
+    assert kronen.missing_parts == {"kronen_prime_blade": 2, "kronen_prime_handle": 1}
+
+
+def test_compute_set_profits_missing_when_user_has_zero_of_multi_qty_part(index: SetIndex) -> None:
+    """Regression for #handle-quantity bug: when a multi-qty part isn't owned at
+    all, `missing_parts` must equal `required_qty`, not `required_qty - 1`.
+    """
+    inventory_counts: dict[str, int] = {}  # user owns nothing
+    floor_prices = {
+        "kronen_prime_blade": 35,
+        "kronen_prime_handle": 20,
+        "kronen_prime_blueprint": 24,
+    }
+    set_prices = {"kronen_prime_set": 200}  # high enough not to be filtered
+
+    rows = compute_set_profits(
+        index=index, inventory=inventory_counts,
+        part_floor_prices=floor_prices, set_prices=set_prices,
+    )
+
+    kronen = next(r for r in rows if r.set_slug == "kronen_prime_set")
+    # Critical: handle must show 2 missing (not 1) since required=2, owned=0.
+    assert kronen.missing_parts == {
+        "kronen_prime_blade": 2,
+        "kronen_prime_handle": 2,
+        "kronen_prime_blueprint": 1,
+    }
 
 
 def test_compute_set_profits_skipped_when_no_set_price(index: SetIndex) -> None:
