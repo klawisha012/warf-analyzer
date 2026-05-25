@@ -27,3 +27,17 @@ export function spreadPct(min: number | null, median: number | null): number | n
   if (min == null || median == null || median === 0) return null;
   return Math.round(((median - min) / median) * 100);
 }
+
+/** `kronen_prime_handle` → `Kronen Prime Handle`. */
+export function prettySlug(slug: string): string {
+  return slug
+    .split("_")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+/** WFM product page for a slug, e.g. `kronen_prime_set` → `https://warframe.market/items/kronen_prime_set`. */
+export function wfmUrl(slug: string): string {
+  return `https://warframe.market/items/${slug}`;
+}

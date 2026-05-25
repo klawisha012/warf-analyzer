@@ -1,6 +1,6 @@
 import { For, Show } from "solid-js";
 import type { SetProfitRow } from "../api/types";
-import { fmtPlat } from "../lib/format";
+import { fmtPlat, prettySlug, wfmUrl } from "../lib/format";
 import Badge from "./Badge";
 import { t } from "../i18n";
 
@@ -12,7 +12,14 @@ export default function SetRowComp(props: { row: SetProfitRow }) {
     <article class="rounded-xl bg-slate-900 border border-slate-800 p-4">
       <header class="flex items-center justify-between gap-3 mb-2">
         <div>
-          <div class="text-slate-100 font-semibold">{props.row.set_name}</div>
+          <a
+            href={wfmUrl(props.row.set_slug)}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-slate-100 font-semibold hover:text-emerald-300 transition-colors"
+          >
+            {props.row.set_name}
+          </a>
           <div class="text-xs text-slate-500 font-mono">{props.row.set_slug}</div>
         </div>
         <Badge variant={profitVariant() as never}>{t("sets.profitBadge", { plat: fmtPlat(props.row.profit) })}</Badge>
@@ -37,8 +44,15 @@ export default function SetRowComp(props: { row: SetProfitRow }) {
           <ul class="flex flex-wrap gap-1">
             <For each={missing()}>
               {([slug, qty]) => (
-                <li class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
-                  {qty}× {slug}
+                <li>
+                  <a
+                    href={wfmUrl(slug)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-emerald-300 hover:bg-slate-700 transition-colors inline-block"
+                  >
+                    {qty}× {prettySlug(slug)}
+                  </a>
                 </li>
               )}
             </For>
