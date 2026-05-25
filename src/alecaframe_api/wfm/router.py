@@ -340,6 +340,10 @@ async def me_sets_profit(
     set_index: SetIndexDep,
     client: WFMClientDep,
     min_margin: Annotated[int, Query(ge=0)] = 0,
+    include_unowned: Annotated[
+        bool,
+        Query(description="Include sets where you own none of the parts (slower; default off)"),
+    ] = False,
 ) -> SetProfitResponse:
     try:
         data = await br.lastdata()
@@ -354,11 +358,20 @@ async def me_sets_profit(
             if slug:
                 inv_by_slug[slug] = inv_by_slug.get(slug, 0) + int(it.get("ItemCount", 1) or 0)
 
+    # Default: only sets where you own ≥1 part. Drops the fetch list from
+    # ~80 sets × 4 parts to whatever the user has, cuts cold-cache wall
+    # time on a Dashboard load from ~30-90s to single-digit seconds.
+    # Pass include_unowned=true to compute the full opportunity surface.
+    relevant_sets = [
+        comp for comp in set_index.all_sets()
+        if include_unowned or any(p in inv_by_slug for p in comp.parts)
+    ]
+
     # Fetch floor for every needed slug + every full-set slug — in parallel.
-    # The WFMClient's AsyncLimiter throttles to ~3 req/s; gather just queues
-    # them, turning N × 333ms sequential into ceil(N/3) × 333ms wall time.
+    # The WFMClient's AsyncLimiter throttles per-second; gather just queues
+    # them, turning N × tick sequential into ceil(N/rate) × tick wall time.
     needed: set[str] = set()
-    for comp in set_index.all_sets():
+    for comp in relevant_sets:
         needed.update(comp.parts.keys())
         needed.add(comp.set_slug)
     needed_list = list(needed)
@@ -370,11 +383,17 @@ async def me_sets_profit(
     for slug, res in zip(needed_list, floor_results):
         floors[slug] = None if isinstance(res, BaseException) else res
 
-    part_floors = {s: v for s, v in floors.items() if s in {p for c in set_index.all_sets() for p in c.parts}}
-    set_floors = {c.set_slug: floors.get(c.set_slug) for c in set_index.all_sets()}
+    # Build a reduced SetIndex containing only `relevant_sets` so
+    # compute_set_profits doesn't try to scan beyond what we fetched.
+    from alecaframe_api.wfm.sets import SetIndex as _SetIndex
+    filtered_index = _SetIndex()
+    for comp in relevant_sets:
+        filtered_index.register(comp)
+    part_floors = {s: v for s, v in floors.items() if s in {p for c in relevant_sets for p in c.parts}}
+    set_floors = {c.set_slug: floors.get(c.set_slug) for c in relevant_sets}
 
     rows = compute_set_profits(
-        index=set_index, inventory=inv_by_slug,
+        index=filtered_index, inventory=inv_by_slug,
         part_floor_prices=part_floors, set_prices=set_floors,
         min_margin=min_margin,
     )
@@ -393,6 +412,10 @@ async def me_wtb_matches(
     slug_resolver: SlugResolverDep,
     client: WFMClientDep,
     min_offer: Annotated[int, Query(ge=1)] = 10,
+    limit: Annotated[
+        int,
+        Query(ge=1, le=500, description="Cap on inventory slugs to scan (highest qty first)"),
+    ] = 50,
 ) -> WtbMatchResponse:
     try:
         data = await br.lastdata()
@@ -406,6 +429,13 @@ async def me_wtb_matches(
             if slug:
                 inv_by_slug[slug] = inv_by_slug.get(slug, 0) + int(it.get("ItemCount", 1) or 0)
 
+    # Cap the scan to top-`limit` slugs by quantity owned. A player with 300+
+    # MiscItems would otherwise pay 300 × 200ms per /me/wtb-matches call —
+    # most of those are low-count fragments unlikely to surface a buyer
+    # offer worth showing on the dashboard.
+    top_slugs = sorted(inv_by_slug.items(), key=lambda kv: -kv[1])[:limit]
+    scan_slugs = dict(top_slugs)
+
     # Parallel fetch — AsyncLimiter handles pacing inside WFMClient.
     async def _fetch(slug: str) -> tuple[str, list[dict] | None]:
         try:
@@ -414,13 +444,13 @@ async def me_wtb_matches(
             return slug, None
         return slug, payload.get("data") or []
 
-    slug_payloads = await asyncio.gather(*[_fetch(s) for s in inv_by_slug.keys()])
+    slug_payloads = await asyncio.gather(*[_fetch(s) for s in scan_slugs.keys()])
 
     matches: list[WtbMatchRow] = []
     for slug, orders in slug_payloads:
         if orders is None:
             continue
-        qty = inv_by_slug[slug]
+        qty = scan_slugs[slug]
         ref = slug_resolver.by_slug(slug)
         for o in orders:
             user = o.get("user") or {}

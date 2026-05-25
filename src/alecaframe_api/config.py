@@ -55,7 +55,10 @@ class Settings(BaseSettings):
     wfm_base_url: str = "https://api.warframe.market/v2"
     wfm_platform: Platform = "pc"
     wfm_language: str = "en"
-    wfm_rate_limit_per_second: int = 3
+    # WFM v2 hasn't published a hard rate limit but historically tolerates 5+
+    # req/s with no 429s; we cap at 5 to keep a safety margin while letting
+    # /me/* fan-out endpoints finish under nginx's 120s proxy_read_timeout.
+    wfm_rate_limit_per_second: int = 5
 
     # uvicorn-only (used by the `run()` entry point in main.py).
     # Default 127.0.0.1 is safe for local dev; the backend Dockerfile sets
