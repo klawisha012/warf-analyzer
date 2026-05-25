@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "aio-pika>=9.5",
     "aiolimiter>=1.2",
+    "aiosqlite>=0.20",
     "apscheduler>=3.10",
     "fastapi>=0.136.3",
     "httpx>=0.28",
