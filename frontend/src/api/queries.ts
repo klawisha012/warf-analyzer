@@ -64,6 +64,8 @@ export const fetchers = {
     }),
   rivenWatchRemove: (slug: string) =>
     api<{ removed: string }>(`/rivens/watchlist/${encodeURIComponent(slug)}`, { method: "DELETE" }),
+  rivenPollNow: (slug: string) =>
+    api<{ polled: string }>(`/rivens/poll/${encodeURIComponent(slug)}`, { method: "POST" }),
   rivenHistory: (slug: string, tier = "all", days = 7) =>
     api<RivenHistoryResponse>(`/rivens/history/${encodeURIComponent(slug)}?tier=${tier}&days=${days}`),
   rivenWeapons: () => api<RivenWeaponsResponse>("/rivens/weapons"),

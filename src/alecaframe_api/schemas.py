@@ -261,6 +261,7 @@ class RivenAuctionRow(BaseModel):
     mod_rank: int | None = None
     polarity: str | None = None
     owner_name: str | None = None
+    owner_status: str | None = None         # 'ingame' | 'online' | 'offline'
     tier: str
     attributes: list[RivenAuctionAttribute] = []
 

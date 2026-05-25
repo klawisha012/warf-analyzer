@@ -87,6 +87,7 @@ resolver: NameResolver
 repo: Repo | None = None
 recipe_uses_idx: dict[str, list[RecipeUse]] = {}
 auctions_client: WFMAuctionClient | None = None
+auction_poller: AuctionPoller | None = None
 
 
 @asynccontextmanager
@@ -200,6 +201,7 @@ async def lifespan(app: FastAPI):
         platform=_settings.wfm_platform, language=_settings.wfm_language,
         rate_limit_per_second=_settings.wfm_rate_limit_per_second,
     )
+    global auction_poller
     auction_poller = AuctionPoller(
         repo=repo, client=auctions_client, publisher=centrifugo,
     )

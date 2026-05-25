@@ -154,6 +154,7 @@ export type RivenAuctionRow = {
   mod_rank: number | null;
   polarity: string | null;
   owner_name: string | null;
+  owner_status: string | null;       // 'ingame' | 'online' | 'offline'
   tier: string;
   attributes: RivenAuctionAttribute[];
 };

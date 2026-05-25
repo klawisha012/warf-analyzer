@@ -73,7 +73,7 @@ async def test_upsert_auction_inserts_then_updates(repo: Repo) -> None:
         buyout_price=200, starting_price=50, top_bid=None,
         re_rolls=4, mod_rank=8, polarity="vazarin",
         attributes=[{"name": "critical_damage", "value": 121, "positive": True}],
-        owner_name="user1", tier="god",
+        owner_name="user1", owner_status="ingame", tier="god",
     )
     # Second seen: price reduced, tier reclassified.
     await repo.upsert_riven_auction(
@@ -81,7 +81,7 @@ async def test_upsert_auction_inserts_then_updates(repo: Repo) -> None:
         buyout_price=150, starting_price=50, top_bid=120,
         re_rolls=4, mod_rank=8, polarity="vazarin",
         attributes=[{"name": "critical_damage", "value": 121, "positive": True}],
-        owner_name="user1", tier="mid",
+        owner_name="user1", owner_status="online", tier="mid",
     )
     rows = await repo.active_riven_auctions("tonkor")
     assert len(rows) == 1
@@ -100,7 +100,7 @@ async def test_mark_gone_flips_status_and_records_ts(repo: Repo) -> None:
         auction_id="a1", weapon_slug="tonkor", seen_at=now,
         buyout_price=200, starting_price=50, top_bid=None,
         re_rolls=0, mod_rank=8, polarity=None, attributes=[],
-        owner_name="user", tier="god",
+        owner_name="user", owner_status="ingame", tier="god",
     )
     # Not present in next poll → mark gone
     n = await repo.mark_riven_auctions_gone(
@@ -124,7 +124,7 @@ async def test_mark_gone_leaves_still_seen_active(repo: Repo) -> None:
             auction_id=aid, weapon_slug="tonkor", seen_at=now,
             buyout_price=100, starting_price=50, top_bid=None,
             re_rolls=0, mod_rank=8, polarity=None, attributes=[],
-            owner_name="u", tier="mid",
+            owner_name="u", owner_status="ingame", tier="mid",
         )
     n = await repo.mark_riven_auctions_gone(
         weapon_slug="tonkor", seen_ids={"a2"}, at=now + 60,

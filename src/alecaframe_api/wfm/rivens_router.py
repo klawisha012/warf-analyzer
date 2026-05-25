@@ -75,6 +75,7 @@ def _to_row(a: dict, tier: str) -> RivenAuctionRow:
         mod_rank=_safe_int(item.get("mod_rank")),
         polarity=item.get("polarity"),
         owner_name=owner.get("ingame_name"),
+        owner_status=owner.get("status"),
         tier=tier,
         attributes=attrs,
     )
@@ -232,6 +233,25 @@ async def riven_history(
         for r in rows
     ]
     return RivenHistoryResponse(weapon_slug=weapon_slug, tier=tier, items=items)
+
+
+@router.post(
+    "/poll/{weapon_slug}",
+    summary="Trigger an immediate snapshot for one weapon (useful right after add)",
+)
+async def riven_poll_now(weapon_slug: str) -> dict:
+    """Run one AuctionPoller cycle for `weapon_slug` synchronously.
+
+    Without this, a newly-added weapon shows an empty price history until
+    the next 60-second poll tick rolls around. Hitting this endpoint right
+    after watchlist_add closes that gap.
+    """
+    from alecaframe_api.main import auction_poller  # noqa: PLC0415
+    if auction_poller is None:
+        raise HTTPException(503, "auction poller not initialised")
+    import time as _t
+    await auction_poller._process_weapon(weapon_slug, int(_t.time()))
+    return {"polled": weapon_slug}
 
 
 @router.get(

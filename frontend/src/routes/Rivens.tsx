@@ -50,6 +50,13 @@ export default function Rivens() {
     await fetchers.rivenWatchAdd(clean);
     await qc.invalidateQueries({ queryKey: keys.rivenWatchlist() });
     setSelected(clean);
+    // Fire an immediate snapshot so the price-history chart starts populating
+    // right away instead of waiting up to 60s for the next poller tick.
+    // Fire-and-forget — if the backend isn't running we just fall back to
+    // the regular poll cadence.
+    fetchers.rivenPollNow(clean)
+      .then(() => qc.invalidateQueries({ queryKey: keys.rivenHistory(clean, "all", 7) }))
+      .catch(() => { /* poller down → next regular tick will cover it */ });
   }
 
   async function remove(slug: string) {
@@ -217,6 +224,10 @@ function WatchlistPanel(p: {
 
 // -------------------------------------------------------------- WeaponView
 
+const PAGE_SIZE = 20;
+const TIER_NAMES = ["god", "mid", "low"] as const;
+type TierName = (typeof TIER_NAMES)[number];
+
 function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
   const auctions = createQuery(() => ({
     queryKey: keys.rivenAuctions(p.slug),
@@ -228,6 +239,27 @@ function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
     queryFn:  () => fetchers.rivenHistory(p.slug, "all", 7),
     refetchInterval: 5 * 60_000,
   }));
+
+  const [onlineOnly, setOnlineOnly] = createSignal(false);
+  const [tierFilter, setTierFilter] = createSignal<TierName | "all">("all");
+
+  // Filter applied to per-tier auction tables. Outliers / stats are
+  // computed by the backend over the full dataset — filtering them too
+  // would skew the discount math.
+  function filterRows(rows: RivenAuctionRow[]): RivenAuctionRow[] {
+    if (!onlineOnly()) return rows;
+    return rows.filter((r) => r.owner_status === "ingame" || r.owner_status === "online");
+  }
+
+  function visibleTiers(): { name: TierName; key: string }[] {
+    const all = [
+      { name: "god" as const, key: "rivens.tierGod" },
+      { name: "mid" as const, key: "rivens.tierMid" },
+      { name: "low" as const, key: "rivens.tierLow" },
+    ];
+    const sel = tierFilter();
+    return sel === "all" ? all : all.filter((t) => t.name === sel);
+  }
 
   return (
     <div class="space-y-4">
@@ -255,6 +287,14 @@ function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
           when={auctions.data}
           fallback={<Card><div class="text-rose-400 text-sm">{t("rivens.auctionsError")}</div></Card>}
         >
+          {/* Filters bar */}
+          <FiltersBar
+            onlineOnly={onlineOnly()}
+            setOnlineOnly={setOnlineOnly}
+            tierFilter={tierFilter()}
+            setTierFilter={setTierFilter}
+          />
+
           {/* Tier stats */}
           <Card title={t("rivens.tierStats")}>
             <TierStatsTable stats={auctions.data!.stats} />
@@ -278,33 +318,115 @@ function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
           </Card>
 
           {/* Per-tier tables */}
-          <For each={[
-            { name: "god" as const, key: "rivens.tierGod" },
-            { name: "mid" as const, key: "rivens.tierMid" },
-            { name: "low" as const, key: "rivens.tierLow" },
-          ]}>
-            {(tier) => (
-              <Show when={auctions.data!.tiers[tier.name].length > 0}>
-                <Card title={t(tier.key as never)}>
-                  <AuctionTable
-                    rows={auctions.data!.tiers[tier.name]}
-                    outliers={auctions.data!.outliers}
-                  />
-                </Card>
-              </Show>
-            )}
+          <For each={visibleTiers()}>
+            {(tier) => {
+              const rows = filterRows(auctions.data!.tiers[tier.name]);
+              return (
+                <Show when={rows.length > 0}>
+                  <Card title={`${t(tier.key as never)} · ${rows.length}`}>
+                    <PaginatedAuctionTable
+                      rows={rows}
+                      outliers={auctions.data!.outliers}
+                    />
+                  </Card>
+                </Show>
+              );
+            }}
           </For>
 
           {/* History */}
           <Card title={t("rivens.historyTitle")}>
-            <Show
-              when={(history.data?.items ?? []).length > 0}
-              fallback={<div class="text-sm text-slate-500">{t("rivens.historyEmpty")}</div>}
-            >
-              <HistorySparkline rows={history.data!.items} />
-            </Show>
+            <HistorySparkline
+              rows={history.data?.items ?? []}
+              loading={history.isLoading}
+            />
           </Card>
         </Show>
+      </Show>
+    </div>
+  );
+}
+
+function FiltersBar(p: {
+  onlineOnly: boolean;
+  setOnlineOnly: (v: boolean) => void;
+  tierFilter: TierName | "all";
+  setTierFilter: (v: TierName | "all") => void;
+}) {
+  return (
+    <div class="flex flex-wrap items-center gap-3 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800">
+      <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={p.onlineOnly}
+          onChange={(e) => p.setOnlineOnly(e.currentTarget.checked)}
+          class="accent-emerald-500"
+        />
+        {t("rivens.onlineOnly")}
+      </label>
+      <div class="flex items-center gap-1">
+        <span class="text-xs text-slate-500 mr-1">{t("rivens.tier")}:</span>
+        <For each={[
+          { v: "all" as const,   label: t("rivens.tierAll") },
+          { v: "god" as const,   label: t("rivens.tierGod") },
+          { v: "mid" as const,   label: t("rivens.tierMid") },
+          { v: "low" as const,   label: t("rivens.tierLow") },
+        ]}>
+          {(opt) => (
+            <button
+              type="button"
+              onClick={() => p.setTierFilter(opt.v)}
+              class="px-2 py-1 text-xs rounded-md border transition-colors"
+              classList={{
+                "bg-slate-800 border-slate-700 text-slate-100": p.tierFilter === opt.v,
+                "border-slate-800 text-slate-400 hover:text-slate-200": p.tierFilter !== opt.v,
+              }}
+            >
+              {opt.label}
+            </button>
+          )}
+        </For>
+      </div>
+    </div>
+  );
+}
+
+function PaginatedAuctionTable(props: { rows: RivenAuctionRow[]; outliers: RivenOutlier[] }) {
+  const [page, setPage] = createSignal(0);
+  const totalPages = createMemo(() => Math.max(1, Math.ceil(props.rows.length / PAGE_SIZE)));
+  // Reset to page 0 when the underlying list shrinks below current page start.
+  createMemo(() => {
+    if (page() >= totalPages()) setPage(0);
+  });
+  const pageRows = createMemo(() => {
+    const start = page() * PAGE_SIZE;
+    return props.rows.slice(start, start + PAGE_SIZE);
+  });
+  return (
+    <div class="space-y-2">
+      <AuctionTable rows={pageRows()} outliers={props.outliers} />
+      <Show when={totalPages() > 1}>
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <button
+            type="button"
+            disabled={page() === 0}
+            onClick={() => setPage(page() - 1)}
+            class="px-2 py-1 rounded border border-slate-800 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            ←
+          </button>
+          <span class="font-mono">
+            {page() + 1} / {totalPages()} · {props.rows.length} {t("rivens.lots")}
+          </span>
+          <button
+            type="button"
+            disabled={page() >= totalPages() - 1}
+            onClick={() => setPage(page() + 1)}
+            class="px-2 py-1 rounded border border-slate-800 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            →
+          </button>
+        </div>
       </Show>
     </div>
   );
@@ -460,7 +582,22 @@ function AuctionTable(props: { rows: RivenAuctionRow[]; outliers: RivenOutlier[]
                     </For>
                   </span>
                 </td>
-                <td class="py-1 px-2 text-slate-400 font-mono">{r.owner_name ?? "—"}</td>
+                <td class="py-1 px-2 text-slate-400 font-mono">
+                  <span class="flex items-center gap-1">
+                    <Show when={r.owner_status}>
+                      <span
+                        class="inline-block w-1.5 h-1.5 rounded-full"
+                        classList={{
+                          "bg-emerald-400": r.owner_status === "ingame",
+                          "bg-sky-400": r.owner_status === "online",
+                          "bg-slate-600": r.owner_status === "offline",
+                        }}
+                        title={r.owner_status ?? ""}
+                      />
+                    </Show>
+                    {r.owner_name ?? "—"}
+                  </span>
+                </td>
               </tr>
             )}
           </For>
@@ -470,12 +607,19 @@ function AuctionTable(props: { rows: RivenAuctionRow[]; outliers: RivenOutlier[]
   );
 }
 
-function HistorySparkline(props: { rows: { ts: number; median: number | null }[] }) {
-  const points = createMemo(() => {
-    const ms = props.rows
+function HistorySparkline(props: {
+  rows: { ts: number; median: number | null }[];
+  loading: boolean;
+}) {
+  const usable = createMemo(() =>
+    props.rows
       .filter((r) => r.median != null)
       .map((r) => ({ ts: r.ts, v: r.median as number }))
-      .sort((a, b) => a.ts - b.ts);
+      .sort((a, b) => a.ts - b.ts),
+  );
+
+  const points = createMemo(() => {
+    const ms = usable();
     if (ms.length < 2) return "";
     const first = ms[0]!, last = ms[ms.length - 1]!;
     const minTs = first.ts, maxTs = last.ts;
@@ -493,12 +637,27 @@ function HistorySparkline(props: { rows: { ts: number; median: number | null }[]
 
   return (
     <Show
-      when={points()}
-      fallback={<div class="text-sm text-slate-500">{t("rivens.historyEmpty")}</div>}
+      when={!props.loading}
+      fallback={<div class="text-sm text-slate-500">{t("rivens.auctionsLoading")}</div>}
     >
-      <svg viewBox="0 0 600 80" class="w-full" preserveAspectRatio="none">
-        <path d={points()} stroke="#10b981" stroke-width="1.5" fill="none" />
-      </svg>
+      <Show
+        when={usable().length >= 2}
+        fallback={
+          <div class="text-sm text-slate-500">
+            {usable().length === 0 ? t("rivens.historyEmpty") : t("rivens.historyOnePoint")}
+          </div>
+        }
+      >
+        <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+          <span>{t("rivens.historyPoints", { n: usable().length })}</span>
+          <span class="font-mono">
+            {fmtPlat(usable()[0]!.v)} → {fmtPlat(usable()[usable().length - 1]!.v)}
+          </span>
+        </div>
+        <svg viewBox="0 0 600 80" class="w-full" preserveAspectRatio="none">
+          <path d={points()} stroke="#10b981" stroke-width="1.5" fill="none" />
+        </svg>
+      </Show>
     </Show>
   );
 }

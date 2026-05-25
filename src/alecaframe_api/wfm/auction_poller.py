@@ -86,6 +86,7 @@ class AuctionPoller:
                 continue
             seen_ids.add(aid)
             item = a.get("item") or {}
+            owner = a.get("owner") or {}
             try:
                 await self.repo.upsert_riven_auction(
                     auction_id=aid, weapon_slug=weapon_slug, seen_at=now,
@@ -96,7 +97,8 @@ class AuctionPoller:
                     mod_rank=_int_or_none(item.get("mod_rank")),
                     polarity=item.get("polarity"),
                     attributes=item.get("attributes") or [],
-                    owner_name=((a.get("owner") or {}).get("ingame_name")),
+                    owner_name=owner.get("ingame_name"),
+                    owner_status=owner.get("status"),
                     tier=tier_of.get(aid, "mid"),
                 )
             except Exception as e:

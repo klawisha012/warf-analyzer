@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS riven_auction (
   polarity        TEXT,
   attributes_json TEXT,                -- [{name, value, positive}, ...]
   owner_name      TEXT,
+  owner_status    TEXT,                -- 'ingame' | 'online' | 'offline'
   tier            TEXT,                -- our classification at last_seen
   status          TEXT NOT NULL,       -- 'active' | 'gone'
   gone_at         INTEGER

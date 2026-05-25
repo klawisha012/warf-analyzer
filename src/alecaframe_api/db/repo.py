@@ -13,6 +13,17 @@ log = logging.getLogger("alecaframe.db.repo")
 _SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 
+async def _try_add_column(conn: aiosqlite.Connection, table: str, column_decl: str) -> None:
+    """ALTER TABLE … ADD COLUMN that's safe to re-run. Used for tiny schema
+    bumps so we don't need a full migration system. The expected failure on
+    a re-run is `duplicate column name` — anything else is re-raised."""
+    try:
+        await conn.execute(f"ALTER TABLE {table} ADD COLUMN {column_decl}")
+    except aiosqlite.OperationalError as e:
+        if "duplicate column" not in str(e).lower():
+            raise
+
+
 @dataclass
 class Repo:
     db_path: Path
@@ -33,6 +44,12 @@ class Repo:
             await conn.execute("PRAGMA busy_timeout=5000")
             await conn.execute("PRAGMA foreign_keys=ON")
             await conn.executescript(_SCHEMA_PATH.read_text(encoding="utf-8"))
+            # Idempotent column adds for existing DBs (schema.sql `CREATE
+            # TABLE IF NOT EXISTS` is a no-op when the table is already
+            # there, so new columns wouldn't appear without an explicit
+            # ALTER). Each add is wrapped — "duplicate column name" is the
+            # expected error on already-migrated DBs and is swallowed.
+            await _try_add_column(conn, "riven_auction", "owner_status TEXT")
             await conn.commit()
         except Exception:
             await conn.close()
@@ -243,10 +260,11 @@ class Repo:
         self, *, auction_id: str, weapon_slug: str, seen_at: int,
         buyout_price: int | None, starting_price: int | None, top_bid: int | None,
         re_rolls: int | None, mod_rank: int | None, polarity: str | None,
-        attributes: list[dict[str, Any]], owner_name: str | None, tier: str,
+        attributes: list[dict[str, Any]], owner_name: str | None,
+        owner_status: str | None, tier: str,
     ) -> None:
         """Insert a new active auction or update an existing one's last_seen +
-        mutable fields (price/tier). Preserves first_seen on update."""
+        mutable fields (price/tier/owner_status). Preserves first_seen on update."""
         conn = self._require_conn()
         attrs_json = json.dumps(attributes)
         await conn.execute(
@@ -254,20 +272,21 @@ class Repo:
                  auction_id, weapon_slug, first_seen, last_seen,
                  buyout_price, starting_price, top_bid,
                  re_rolls, mod_rank, polarity, attributes_json,
-                 owner_name, tier, status, gone_at
-               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NULL)
+                 owner_name, owner_status, tier, status, gone_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NULL)
                ON CONFLICT(auction_id) DO UPDATE SET
                  last_seen      = excluded.last_seen,
                  buyout_price   = excluded.buyout_price,
                  starting_price = excluded.starting_price,
                  top_bid        = excluded.top_bid,
+                 owner_status   = excluded.owner_status,
                  tier           = excluded.tier,
                  status         = 'active',
                  gone_at        = NULL""",
             (auction_id, weapon_slug, seen_at, seen_at,
              buyout_price, starting_price, top_bid,
              re_rolls, mod_rank, polarity, attrs_json,
-             owner_name, tier),
+             owner_name, owner_status, tier),
         )
         await conn.commit()
 
