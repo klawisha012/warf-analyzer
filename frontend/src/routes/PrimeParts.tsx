@@ -27,7 +27,9 @@ export default function PrimeParts() {
     filtered().reduce((sum, it) => sum + (it.estimated_value ?? 0), 0),
   );
 
-  useSlugChannel(() => filtered().slice(0, 10).map((it) => it.slug).filter(Boolean) as string[]);
+  // Subscribe to every visible row, not just top-10: the page is fully
+  // scrolled and a price update on row 25 needs to reach the UI too.
+  useSlugChannel(() => filtered().map((it) => it.slug).filter(Boolean) as string[]);
 
   return (
     <div class="space-y-4">

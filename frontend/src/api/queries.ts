@@ -3,6 +3,7 @@ import type {
   ApiInfo, HealthResponse,
   OrderBookResponse,
   PricedItemListResponse,
+  PricesSnapshotResponse,
   RefreshResponse,
   RelistNudgeResponse,
   SetProfitResponse,
@@ -42,4 +43,6 @@ export const fetchers = {
     api<WtbMatchResponse>(`/me/wtb-matches?min_offer=${min_offer}`),
   meRelistNudges: () => api<RelistNudgeResponse>("/me/relist-nudges"),
   refresh: () => api<RefreshResponse>("/refresh", { method: "POST" }),
+  prices: (slugs: string[]) =>
+    api<PricesSnapshotResponse>(`/prices?slugs=${encodeURIComponent(slugs.join(","))}`),
 };

@@ -48,3 +48,33 @@ class CentrifugoPublisher:
                                 channel, resp.status_code, resp.text[:200])
         except Exception as e:
             log.warning("centrifugo publish %s failed: %s", channel, e)
+
+    async def list_channels(self, *, pattern: str = "") -> set[str]:
+        """Return the set of active Centrifugo channels matching `pattern`.
+
+        Used by PricePoller to discover which slugs the frontend is currently
+        watching: an active `wfm.orders.{slug}` subscription means the slug
+        is visible somewhere in the UI and should be kept fresh.
+
+        Returns an empty set on any Centrifugo failure — the poller treats
+        "no subscribers" the same as "nobody is watching", which is the safe
+        fallback.
+        """
+        body = {"method": "channels", "params": {"pattern": pattern}}
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as c:
+                resp = await c.post(
+                    self.api_url,
+                    json=body,
+                    headers={"X-API-Key": self.api_key, "Content-Type": "application/json"},
+                )
+                if resp.status_code >= 400:
+                    log.warning("centrifugo channels status %d: %s",
+                                resp.status_code, resp.text[:200])
+                    return set()
+                payload = resp.json()
+        except Exception as e:
+            log.warning("centrifugo channels failed: %s", e)
+            return set()
+        result = (payload.get("result") or {}).get("channels") or {}
+        return set(result.keys())

@@ -1,9 +1,10 @@
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createSignal, createMemo } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import Card from "../components/Card";
 import EmptyState from "../components/EmptyState";
 import SetRowComp from "../components/SetRow";
 import { fetchers, keys } from "../api/queries";
+import { useSlugChannel } from "../hooks/useSlugChannel";
 import { t } from "../i18n";
 
 export default function Sets() {
@@ -13,6 +14,21 @@ export default function Sets() {
     queryKey: keys.meSetsProfit(minMargin()),
     queryFn:  () => fetchers.meSetsProfit(minMargin()),
   }));
+
+  // Subscribe to every slug touched by the visible sets — set slug itself
+  // plus every missing-part slug. On push we update the global price store
+  // AND invalidate this query so the recomputed profit is correct.
+  const visibleSlugs = createMemo(() => {
+    const items = sets.data?.items ?? [];
+    const out = new Set<string>();
+    for (const r of items) {
+      if (r.set_slug) out.add(r.set_slug);
+      for (const partSlug of Object.keys(r.missing_parts ?? {})) out.add(partSlug);
+      for (const partSlug of Object.keys(r.owned_parts ?? {})) out.add(partSlug);
+    }
+    return Array.from(out);
+  });
+  useSlugChannel(visibleSlugs);
 
   return (
     <div class="space-y-4">

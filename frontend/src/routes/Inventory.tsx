@@ -26,7 +26,9 @@ export default function Inventory() {
     return needle ? all.filter((x) => x.name.toLowerCase().includes(needle)) : all;
   });
 
-  useSlugChannel(() => filtered().slice(0, 10).map((it) => it.slug).filter(Boolean) as string[]);
+  // Subscribe to every visible row so a push for any visible slug updates
+  // the price store and re-renders that card.
+  useSlugChannel(() => filtered().map((it) => it.slug).filter(Boolean) as string[]);
 
   return (
     <div class="space-y-4">

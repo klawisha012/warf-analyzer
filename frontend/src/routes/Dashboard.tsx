@@ -27,10 +27,16 @@ export default function Dashboard() {
     queryFn:  fetchers.meRelistNudges,
   }));
 
-  useSlugChannel(() => [
-    ...(wtb.data?.items ?? []).map((m) => m.slug),
-    ...(nudges.data?.items ?? []).map((n) => n.slug),
-  ].filter(Boolean) as string[]);
+  useSlugChannel(() => {
+    const out = new Set<string>();
+    for (const m of wtb.data?.items ?? []) if (m.slug) out.add(m.slug);
+    for (const n of nudges.data?.items ?? []) if (n.slug) out.add(n.slug);
+    for (const s of sets.data?.items ?? []) {
+      if (s.set_slug) out.add(s.set_slug);
+      for (const p of Object.keys(s.missing_parts ?? {})) out.add(p);
+    }
+    return Array.from(out);
+  });
 
   return (
     <div class="space-y-6">

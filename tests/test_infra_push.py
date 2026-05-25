@@ -45,3 +45,32 @@ async def test_publish_swallows_5xx(publisher: CentrifugoPublisher, httpx_mock: 
     httpx_mock.add_response(url="http://centri.test/api", method="POST", status_code=500, text="boom")
     # Should not raise.
     await publisher.publish("any.channel", {"k": "v"})
+
+
+@pytest.mark.asyncio
+async def test_list_channels_returns_active(publisher: CentrifugoPublisher, httpx_mock: HTTPXMock) -> None:
+    """Centrifugo server-API `channels` method returns active channel names."""
+    httpx_mock.add_response(
+        url="http://centri.test/api", method="POST",
+        json={"result": {"channels": {
+            "wfm.orders.kronen_prime_blade": {"num_clients": 1},
+            "wfm.orders.lato_vandal_set": {"num_clients": 2},
+        }}},
+    )
+    chans = await publisher.list_channels(pattern="wfm.orders.*")
+    assert chans == {"wfm.orders.kronen_prime_blade", "wfm.orders.lato_vandal_set"}
+    req = httpx_mock.get_request()
+    import json as _j
+    body = _j.loads(req.content)
+    assert body["method"] == "channels"
+    assert body["params"]["pattern"] == "wfm.orders.*"
+
+
+@pytest.mark.asyncio
+async def test_list_channels_returns_empty_on_failure(
+    publisher: CentrifugoPublisher, httpx_mock: HTTPXMock,
+) -> None:
+    """Centrifugo down → empty set, not exception (poller must keep ticking)."""
+    httpx_mock.add_response(url="http://centri.test/api", method="POST", status_code=500, text="boom")
+    chans = await publisher.list_channels(pattern="wfm.orders.*")
+    assert chans == set()

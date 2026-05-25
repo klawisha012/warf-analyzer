@@ -20,14 +20,22 @@ from alecaframe_api.naming import NameResolver
 from alecaframe_api.schemas import (
     ItemUseRef,
     OrderBookResponse, OrderBookStatsModel, OrderRow,
-    PricedItemEntry, PricedItemListResponse,
+    PriceStatsModel, PricedItemEntry, PricedItemListResponse,
+    PricesSnapshotResponse,
     RelistNudgeResponse, RelistNudgeRow,
     SetProfitResponse, SetProfitRowModel,
     WFMItemRef, WFMItemsResponse,
     WtbMatchResponse, WtbMatchRow,
 )
-from alecaframe_api.wfm.client import WFMError
-from alecaframe_api.wfm.dependencies import SetIndexDep, SlugResolverDep, WFMClientDep
+from alecaframe_api.wfm.client import WFMClient, WFMError
+from alecaframe_api.wfm.dependencies import (
+    PriceStoreDep,
+    SetIndexDep,
+    SlugResolverDep,
+    WFMClientDep,
+)
+from alecaframe_api.wfm.price_poller import stats_from_orders
+from alecaframe_api.wfm.price_store import PriceStats, PriceStore
 from alecaframe_api.wfm.prices import compute_stats
 from alecaframe_api.wfm.sets import compute_set_profits
 
@@ -189,6 +197,76 @@ async def _floor_for(client, slug: str, *, online_only: bool) -> int | None:
     return stats.min_price
 
 
+async def _fetch_one_into_store(
+    client: WFMClient, store: PriceStore, slug: str,
+) -> PriceStats | None:
+    """Fetch a single slug's orders from WFM and write the projected PriceStats
+    into the store. Returns the new record (or None on failure)."""
+    import time as _t
+    try:
+        payload = await client.get_orders(slug)
+    except WFMError:
+        return None
+    orders = payload.get("data") or []
+    stats = stats_from_orders(slug, orders, now=_t.time(), stale=bool(payload.get("_stale")))
+    store.set(stats)
+    return stats
+
+
+async def ensure_prices(
+    client: WFMClient, store: PriceStore, slugs: list[str],
+) -> dict[str, PriceStats]:
+    """Make sure every slug in `slugs` has a PriceStats in the store.
+
+    For slugs already present: returns the cached value (the poller keeps it
+    fresh once a frontend subscribes via Centrifugo).
+    For slugs absent: parallel-fetches from WFM and populates the store. WFM
+    failures degrade silently — the slug ends up missing from the result map,
+    matching the pre-PriceStore behaviour where price fields were None.
+    """
+    have = store.bulk_get(slugs)
+    missing = [s for s in slugs if s not in have]
+    if not missing:
+        return have
+
+    fetched = await asyncio.gather(
+        *[_fetch_one_into_store(client, store, s) for s in missing],
+        return_exceptions=True,
+    )
+    out = dict(have)
+    for slug, res in zip(missing, fetched):
+        if isinstance(res, PriceStats):
+            out[slug] = res
+    return out
+
+
+@router.get(
+    "/prices", response_model=PricesSnapshotResponse,
+    summary="Bulk price snapshot for a list of slugs (lazy-populates the store)",
+)
+async def prices_snapshot(
+    client: WFMClientDep, store: PriceStoreDep,
+    slugs: Annotated[str, Query(description="Comma-separated list of slugs")] = "",
+) -> PricesSnapshotResponse:
+    slug_list = [s.strip() for s in slugs.split(",") if s.strip()]
+    if not slug_list:
+        return PricesSnapshotResponse(total=0, prices={})
+    found = await ensure_prices(client, store, slug_list)
+    out: dict[str, PriceStatsModel] = {
+        slug: PriceStatsModel(
+            slug=stats.slug,
+            sell_min=stats.sell_min,
+            sell_median=stats.sell_median,
+            sell_spread=stats.sell_spread,
+            buy_max=stats.buy_max,
+            fetched_at=stats.fetched_at,
+            stale=stats.stale,
+        )
+        for slug, stats in found.items()
+    }
+    return PricesSnapshotResponse(total=len(out), prices=out)
+
+
 @router.get("/me/listings", summary="Your active WTS/WTB on WFM (raw v2 payload)")
 async def me_listings(client: WFMClientDep) -> dict[str, Any]:
     """Returns the raw `/v2/me/orders` payload (`{apiVersion, data: [...]}`).
@@ -212,6 +290,7 @@ async def me_inventory_priced(
     rs: ResolverDep,
     slug_resolver: SlugResolverDep,
     client: WFMClientDep,
+    store: PriceStoreDep,
     slot: Annotated[str, Query(description="warframe|primary|secondary|melee|all")] = "all",
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> PricedItemListResponse:
@@ -235,31 +314,30 @@ async def me_inventory_priced(
         raw_items = list(data.get(section_map[slot]) or [])
 
     recipe_uses = _get_recipe_uses()
-    enriched: list[PricedItemEntry] = []
-    seen_slugs: set[str] = set()
+
+    # First pass: resolve slugs for items we're about to ship. Collect uniques
+    # so we hit the price store + WFM exactly once per slug instead of once
+    # per inventory row.
+    rows_to_emit: list[tuple[dict, str, str | None]] = []   # (raw_item, unique_name, slug)
+    needed_slugs: list[str] = []
+    seen_for_fetch: set[str] = set()
     for it in raw_items[:limit]:
         u = it.get("ItemType") or ""
         slug = slug_resolver.resolve_unique_name(u)
+        rows_to_emit.append((it, u, slug))
+        if slug and slug not in seen_for_fetch:
+            seen_for_fetch.add(slug)
+            needed_slugs.append(slug)
+
+    prices = await ensure_prices(client, store, needed_slugs)
+
+    enriched: list[PricedItemEntry] = []
+    for it, u, slug in rows_to_emit:
         name = (rs.lookup(u) or {}).get("name") or rs.resolve(u)
-        sell_min, sell_median, sell_spread, buy_max, vaulted = None, None, None, None, None
-        if slug and slug not in seen_slugs:
-            seen_slugs.add(slug)
-            ref = slug_resolver.by_slug(slug)
-            vaulted = ref.vaulted if ref else None
-            try:
-                payload = await client.get_orders(slug)
-                orders = payload.get("data") or []
-                sell = compute_stats(orders, side="sell", online_only=True)
-                buy = compute_stats(orders, side="buy", online_only=True)
-                sell_min, sell_median = sell.min_price, sell.median
-                sell_spread = (
-                    (sell.max_price - sell.min_price)
-                    if sell.min_price is not None and sell.max_price is not None
-                    else None
-                )
-                buy_max = buy.max_price
-            except WFMError:
-                pass
+        stats = prices.get(slug) if slug else None
+        ref = slug_resolver.by_slug(slug) if slug else None
+        vaulted = ref.vaulted if ref else None
+        sell_median = stats.sell_median if stats else None
         used_in = [
             ItemUseRef(
                 name=use.result_name,
@@ -271,9 +349,12 @@ async def me_inventory_priced(
         enriched.append(PricedItemEntry(
             unique_name=u, name=name, slug=slug,
             count=it.get("ItemCount"), vaulted=vaulted,
-            sell_min=sell_min, sell_median=sell_median, sell_spread=sell_spread,
-            buy_max=buy_max,
+            sell_min=stats.sell_min if stats else None,
+            sell_median=sell_median,
+            sell_spread=stats.sell_spread if stats else None,
+            buy_max=stats.buy_max if stats else None,
             estimated_value=(sell_median * (it.get("ItemCount") or 1)) if sell_median else None,
+            stale=bool(stats.stale) if stats else False,
             used_in=used_in,
         ))
 
@@ -289,6 +370,7 @@ async def me_prime_parts_priced(
     rs: ResolverDep,
     slug_resolver: SlugResolverDep,
     client: WFMClientDep,
+    store: PriceStoreDep,
     min_count: Annotated[int, Query(ge=1)] = 1,
 ) -> PricedItemListResponse:
     try:
@@ -303,44 +385,27 @@ async def me_prime_parts_priced(
             if t.startswith("/Lotus/Types/Recipes/") and "Prime" in t:
                 agg[t] = agg.get(t, 0) + int(it.get("ItemCount", 1) or 0)
 
-    # Resolve slugs first, then parallel-fetch orders for each known slug.
     eligible = [(u, count) for u, count in agg.items() if count >= min_count]
     slugs_for: dict[str, str | None] = {u: slug_resolver.resolve_unique_name(u) for u, _ in eligible}
-
-    async def _fetch_orders(slug: str | None) -> list[dict] | None:
-        if not slug:
-            return None
-        try:
-            payload = await client.get_orders(slug)
-            return payload.get("data") or []
-        except WFMError:
-            return None
-
-    fetch_results = await asyncio.gather(*[_fetch_orders(slugs_for[u]) for u, _ in eligible])
+    needed = [s for s in slugs_for.values() if s]
+    prices = await ensure_prices(client, store, needed)
 
     rows: list[PricedItemEntry] = []
-    for (u, count), orders in zip(eligible, fetch_results):
+    for u, count in eligible:
         slug = slugs_for[u]
         name = (rs.lookup(u) or {}).get("name") or rs.resolve(u)
-        sell_min, sell_median, sell_spread, buy_max, vaulted = None, None, None, None, None
-        if slug:
-            ref = slug_resolver.by_slug(slug)
-            vaulted = ref.vaulted if ref else None
-            if orders is not None:
-                sell = compute_stats(orders, side="sell", online_only=True)
-                buy = compute_stats(orders, side="buy", online_only=True)
-                sell_min, sell_median = sell.min_price, sell.median
-                sell_spread = (
-                    (sell.max_price - sell.min_price)
-                    if sell.min_price is not None and sell.max_price is not None
-                    else None
-                )
-                buy_max = buy.max_price
+        stats = prices.get(slug) if slug else None
+        ref = slug_resolver.by_slug(slug) if slug else None
+        vaulted = ref.vaulted if ref else None
+        sell_median = stats.sell_median if stats else None
         rows.append(PricedItemEntry(
             unique_name=u, name=name, slug=slug, count=count, vaulted=vaulted,
-            sell_min=sell_min, sell_median=sell_median, sell_spread=sell_spread,
-            buy_max=buy_max,
+            sell_min=stats.sell_min if stats else None,
+            sell_median=sell_median,
+            sell_spread=stats.sell_spread if stats else None,
+            buy_max=stats.buy_max if stats else None,
             estimated_value=(sell_median * count) if sell_median else None,
+            stale=bool(stats.stale) if stats else False,
         ))
 
     rows.sort(key=lambda r: -((r.estimated_value or 0)))
@@ -356,6 +421,7 @@ async def me_sets_profit(
     slug_resolver: SlugResolverDep,
     set_index: SetIndexDep,
     client: WFMClientDep,
+    store: PriceStoreDep,
     min_margin: Annotated[int, Query(ge=0)] = 0,
     include_unowned: Annotated[
         bool,
@@ -384,21 +450,16 @@ async def me_sets_profit(
         if include_unowned or any(p in inv_by_slug for p in comp.parts)
     ]
 
-    # Fetch floor for every needed slug + every full-set slug — in parallel.
-    # The WFMClient's AsyncLimiter throttles per-second; gather just queues
-    # them, turning N × tick sequential into ceil(N/rate) × tick wall time.
+    # Pull floors from the shared PriceStore. Lazy-populate any missing slugs
+    # in parallel — once populated, subsequent calls (and other pages) get the
+    # same cached value, and the poller refreshes them while the UI is open.
     needed: set[str] = set()
     for comp in relevant_sets:
         needed.update(comp.parts.keys())
         needed.add(comp.set_slug)
     needed_list = list(needed)
-    floor_results = await asyncio.gather(
-        *[_floor_for(client, s, online_only=True) for s in needed_list],
-        return_exceptions=True,
-    )
-    floors: dict[str, int | None] = {}
-    for slug, res in zip(needed_list, floor_results):
-        floors[slug] = None if isinstance(res, BaseException) else res
+    price_map = await ensure_prices(client, store, needed_list)
+    floors: dict[str, int | None] = {s: (price_map[s].sell_min if s in price_map else None) for s in needed_list}
 
     # Build a reduced SetIndex containing only `relevant_sets` so
     # compute_set_profits doesn't try to scan beyond what we fetched.

@@ -121,6 +121,21 @@ export type WFMItemRef = {
 
 export type WFMItemsResponse = { total: number; items: WFMItemRef[] };
 
+export type PriceStats = {
+  slug: string;
+  sell_min: number | null;
+  sell_median: number | null;
+  sell_spread: number | null;
+  buy_max: number | null;
+  fetched_at: number;
+  stale: boolean;
+};
+
+export type PricesSnapshotResponse = {
+  total: number;
+  prices: Record<string, PriceStats>;
+};
+
 export type WtbMatch = {
   slug: string;
   item_name: string;

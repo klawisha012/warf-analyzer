@@ -16,6 +16,7 @@ from fastapi import Depends
 
 from alecaframe_api.db.repo import Repo
 from alecaframe_api.wfm.client import WFMClient
+from alecaframe_api.wfm.price_store import PriceStore
 from alecaframe_api.wfm.sets import SetIndex
 from alecaframe_api.wfm.slugs import SlugResolver
 
@@ -25,6 +26,7 @@ wfm_client: WFMClient | None = None
 slug_resolver: SlugResolver | None = None
 set_index: SetIndex | None = None
 repo: Repo | None = None
+price_store: PriceStore | None = None
 
 
 def get_wfm_client() -> WFMClient:
@@ -51,7 +53,14 @@ def get_repo() -> Repo:
     return repo
 
 
+def get_price_store() -> PriceStore:
+    if price_store is None:
+        raise RuntimeError("PriceStore not initialised; main.py lifespan must set it")
+    return price_store
+
+
 WFMClientDep = Annotated[WFMClient, Depends(get_wfm_client)]
 SlugResolverDep = Annotated[SlugResolver, Depends(get_slug_resolver)]
 SetIndexDep = Annotated[SetIndex, Depends(get_set_index)]
 RepoDep = Annotated[Repo, Depends(get_repo)]
+PriceStoreDep = Annotated[PriceStore, Depends(get_price_store)]

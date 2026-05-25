@@ -225,3 +225,18 @@ class WFMItemRef(BaseModel):
 class WFMItemsResponse(BaseModel):
     total: int
     items: list[WFMItemRef]
+
+
+class PriceStatsModel(BaseModel):
+    slug: str
+    sell_min: int | None = None
+    sell_median: int | None = None
+    sell_spread: int | None = None
+    buy_max: int | None = None
+    fetched_at: float
+    stale: bool = False
+
+
+class PricesSnapshotResponse(BaseModel):
+    total: int
+    prices: dict[str, PriceStatsModel]

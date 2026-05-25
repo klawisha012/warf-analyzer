@@ -29,6 +29,8 @@ from .infra.broker import RabbitMQBus
 from .infra.push import CentrifugoPublisher
 from .wfm.consumer import handle_live_order
 from .wfm.me_router import router as me_router
+from .wfm.price_poller import PricePoller
+from .wfm.price_store import PriceStore
 from .wfm.sets import SetComposition, SetIndex
 from .wfm.slugs import SlugResolver
 from .db.repo import Repo
@@ -164,6 +166,7 @@ async def lifespan(app: FastAPI):
     wfm_deps.slug_resolver = slug_resolver
     wfm_deps.set_index = set_idx
     wfm_deps.repo = repo
+    wfm_deps.price_store = PriceStore()
 
     # ----- Real-time subsystem -----
     centrifugo = CentrifugoPublisher(
@@ -171,6 +174,14 @@ async def lifespan(app: FastAPI):
         api_key=_settings.centrifugo_api_key,
         token_hmac_secret=_settings.centrifugo_token_hmac_secret,
     )
+
+    # Price poller: keeps wfm.orders.{slug} live for any subscribed slug.
+    price_poller = PricePoller(
+        store=wfm_deps.price_store,
+        wfm_client=wfm_client,
+        publisher=centrifugo,
+    )
+    price_poller_task = asyncio.create_task(price_poller.run())
     bus = RabbitMQBus(url=_settings.rabbitmq_url)
     _consumer_subscribed = {"v": False}
 
@@ -212,6 +223,11 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
+    price_poller_task.cancel()
+    try:
+        await price_poller_task
+    except (asyncio.CancelledError, Exception):
+        pass
     await wfm_client.aclose()
     await bus.aclose()
     if repo is not None:
