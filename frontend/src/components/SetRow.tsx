@@ -2,6 +2,7 @@ import { For, Show } from "solid-js";
 import type { SetProfitRow } from "../api/types";
 import { fmtPlat } from "../lib/format";
 import Badge from "./Badge";
+import { t } from "../i18n";
 
 export default function SetRowComp(props: { row: SetProfitRow }) {
   const profitVariant = () =>
@@ -14,25 +15,25 @@ export default function SetRowComp(props: { row: SetProfitRow }) {
           <div class="text-slate-100 font-semibold">{props.row.set_name}</div>
           <div class="text-xs text-slate-500 font-mono">{props.row.set_slug}</div>
         </div>
-        <Badge variant={profitVariant() as never}>+{fmtPlat(props.row.profit)} profit</Badge>
+        <Badge variant={profitVariant() as never}>{t("sets.profitBadge", { plat: fmtPlat(props.row.profit) })}</Badge>
       </header>
       <dl class="grid grid-cols-3 gap-2 text-sm mb-2">
         <div>
-          <dt class="text-slate-400 text-xs">Set price</dt>
+          <dt class="text-slate-400 text-xs">{t("sets.setPrice")}</dt>
           <dd class="font-mono text-slate-100">{fmtPlat(props.row.set_price)}</dd>
         </div>
         <div>
-          <dt class="text-slate-400 text-xs">Parts cost</dt>
+          <dt class="text-slate-400 text-xs">{t("sets.partsCost")}</dt>
           <dd class="font-mono text-slate-100">{fmtPlat(props.row.parts_cost)}</dd>
         </div>
         <div>
-          <dt class="text-slate-400 text-xs">Tax (est.)</dt>
+          <dt class="text-slate-400 text-xs">{t("sets.taxEst")}</dt>
           <dd class="font-mono text-slate-300">{fmtPlat(props.row.tax_estimate)}</dd>
         </div>
       </dl>
       <Show when={missing().length > 0}>
         <div>
-          <div class="text-xs text-slate-400 mb-1">To buy:</div>
+          <div class="text-xs text-slate-400 mb-1">{t("sets.toBuy")}</div>
           <ul class="flex flex-wrap gap-1">
             <For each={missing()}>
               {([slug, qty]) => (

@@ -6,6 +6,7 @@ import EmptyState from "../components/EmptyState";
 import { fetchers, keys } from "../api/queries";
 import { fmtPlat, fmtInt } from "../lib/format";
 import { useSlugChannel } from "../hooks/useSlugChannel";
+import { t } from "../i18n";
 
 export default function Dashboard() {
   const health = createQuery(() => ({
@@ -34,7 +35,7 @@ export default function Dashboard() {
   return (
     <div class="space-y-6">
       <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card title="Health">
+        <Card title={t("dashboard.healthTitle")}>
           <div
             class="text-2xl font-semibold"
             classList={{
@@ -43,23 +44,23 @@ export default function Dashboard() {
               "text-slate-400": !health.data,
             }}
           >
-            {health.isLoading ? "…" : health.data?.ok ? "online" : "offline"}
+            {health.isLoading ? "…" : health.data?.ok ? t("common.online") : t("common.offline")}
           </div>
         </Card>
-        <Card title="WFM user">
-          <div class="text-xl font-mono">{health.data?.wfm_username ?? "—"}</div>
+        <Card title={t("dashboard.wfmUserTitle")}>
+          <div class="text-xl font-mono">{health.data?.wfm_username ?? t("common.dash")}</div>
         </Card>
-        <Card title="AlecaFrame">
-          <div class="text-xl font-mono">v{health.data?.aleca_version ?? "—"}</div>
+        <Card title={t("dashboard.alecaTitle")}>
+          <div class="text-xl font-mono">v{health.data?.aleca_version ?? t("common.dash")}</div>
         </Card>
       </section>
 
       <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card title="Top WTB matches" subtitle="Buyers asking for what you own (≥15p)">
-          <Show when={!wtb.isLoading} fallback={<div class="text-slate-500">Loading…</div>}>
+        <Card title={t("dashboard.wtbTitle")} subtitle={t("dashboard.wtbSubtitle")}>
+          <Show when={!wtb.isLoading} fallback={<div class="text-slate-500">{t("common.loading")}</div>}>
             <Show
               when={(wtb.data?.items ?? []).length > 0}
-              fallback={<EmptyState title="No live WTB matches" hint="Lower min_offer or come back later." />}
+              fallback={<EmptyState title={t("dashboard.wtbEmpty")} hint={t("dashboard.wtbEmptyHint")} />}
             >
               <ul class="space-y-2">
                 <For each={wtb.data!.items.slice(0, 5)}>
@@ -68,7 +69,7 @@ export default function Dashboard() {
                       <div>
                         <div class="text-slate-100">{m.item_name}</div>
                         <div class="text-xs text-slate-500 font-mono">
-                          {m.buyer} · {m.buyer_status} · rep {fmtInt(m.buyer_reputation)}
+                          {m.buyer} · {m.buyer_status} · {t("dashboard.rep")} {fmtInt(m.buyer_reputation)}
                         </div>
                       </div>
                       <Badge variant="good">{fmtPlat(m.offer_price)}</Badge>
@@ -80,11 +81,11 @@ export default function Dashboard() {
           </Show>
         </Card>
 
-        <Card title="Top set profits" subtitle="Buyable sets with margin ≥10p">
-          <Show when={!sets.isLoading} fallback={<div class="text-slate-500">Loading…</div>}>
+        <Card title={t("dashboard.setsTitle")} subtitle={t("dashboard.setsSubtitle")}>
+          <Show when={!sets.isLoading} fallback={<div class="text-slate-500">{t("common.loading")}</div>}>
             <Show
               when={(sets.data?.items ?? []).length > 0}
-              fallback={<EmptyState title="No profitable sets" hint="Inventory + market mix doesn't open a gap right now." />}
+              fallback={<EmptyState title={t("dashboard.setsEmpty")} hint={t("dashboard.setsEmptyHint")} />}
             >
               <ul class="space-y-2">
                 <For each={sets.data!.items.slice(0, 5)}>
@@ -100,11 +101,11 @@ export default function Dashboard() {
           </Show>
         </Card>
 
-        <Card title="Re-list nudges" subtitle="Listings off the top-5 / below median">
-          <Show when={!nudges.isLoading} fallback={<div class="text-slate-500">Loading…</div>}>
+        <Card title={t("dashboard.nudgesTitle")} subtitle={t("dashboard.nudgesSubtitle")}>
+          <Show when={!nudges.isLoading} fallback={<div class="text-slate-500">{t("common.loading")}</div>}>
             <Show
               when={(nudges.data?.items ?? []).length > 0}
-              fallback={<EmptyState title="All competitive" hint="Your listings are still in the top of the book." />}
+              fallback={<EmptyState title={t("dashboard.nudgesEmpty")} hint={t("dashboard.nudgesEmptyHint")} />}
             >
               <ul class="space-y-2">
                 <For each={nudges.data!.items.slice(0, 5)}>
