@@ -136,6 +136,26 @@ async def _main() -> None:
         )),
         trigger="interval", minutes=30,
     )
+
+    # Snapshot job — every 30 min, fetch /orders for each subscribed slug + write snapshot
+    from alecaframe_api.db.repo import Repo
+    from alecaframe_api.wfm.history import write_snapshot
+    poller_repo = Repo(db_path=s.sqlite_path)
+    await poller_repo.connect()
+
+    async def _snapshot_subscribed_slugs() -> None:
+        for slug in list(socket_client._slugs)[:20]:   # cap to stay under rate limit
+            try:
+                payload = await wfm_client.get_orders(slug)
+                orders = (payload.get("payload") or {}).get("orders") or []
+                await write_snapshot(repo=poller_repo, slug=slug, orders=orders)
+            except Exception as e:
+                log.warning("snapshot for %s failed: %s", slug, e)
+
+    sched.add_job(
+        lambda: asyncio.create_task(_snapshot_subscribed_slugs()),
+        trigger="interval", minutes=30,
+    )
     sched.start()
 
     stop = asyncio.Event()
@@ -156,6 +176,7 @@ async def _main() -> None:
     ws_task.cancel()
     await bus.aclose()
     await wfm_client.aclose()
+    await poller_repo.close()
     await redis_client.aclose()
     log.info("poller stopped")
 

@@ -1,0 +1,12 @@
+[
+  {
+    "uniqueName": "/Lotus/Powersuits/Mag/MagPrime",
+    "name": "Mag Prime",
+    "components": [
+      {"name": "Blueprint", "uniqueName": "/Lotus/Types/Recipes/WarframeRecipes/MagPrimeBlueprint", "itemCount": 1, "primeSellingPrice": 25},
+      {"name": "Neuroptics", "uniqueName": "/Lotus/Types/Recipes/WarframeRecipes/MagPrimeHelmetBlueprint", "itemCount": 1, "primeSellingPrice": 15},
+      {"name": "Chassis", "uniqueName": "/Lotus/Types/Recipes/WarframeRecipes/MagPrimeChassisBlueprint", "itemCount": 1, "primeSellingPrice": 15},
+      {"name": "Systems", "uniqueName": "/Lotus/Types/Recipes/WarframeRecipes/MagPrimeSystemsBlueprint", "itemCount": 1, "primeSellingPrice": 15}
+    ]
+  }
+]
