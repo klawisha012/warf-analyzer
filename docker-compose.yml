@@ -6,7 +6,7 @@ x-backend-env: &backend-env
   ALECA_RABBITMQ_URL: ${ALECA_RABBITMQ_URL:-amqp://aleca:aleca-local@rabbitmq:5672/}
   ALECA_CENTRIFUGO_API: http://centrifugo:8000/api
   ALECA_CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:-local-dev-api-key-change-me}
-  ALECA_CENTRIFUGO_TOKEN_HMAC_SECRET: ${CENTRIFUGO_TOKEN_HMAC_SECRET:-local-dev-hmac-secret-change-me}
+  ALECA_CENTRIFUGO_TOKEN_HMAC_SECRET: ${CENTRIFUGO_TOKEN_HMAC_SECRET:-local-dev-hmac-secret-change-me-do-not-use-in-prod-or-with-real-data}
   ALECA_DATA_DIR: /data
   ALECA_TTL_SECONDS: ${ALECA_TTL_SECONDS:-60}
   ALECA_WFM_PLATFORM: ${ALECA_WFM_PLATFORM:-pc}
@@ -56,7 +56,7 @@ services:
     ports: ["127.0.0.1:8002:8000"]
     environment:
       CENTRIFUGO_HTTP_API_KEY: ${CENTRIFUGO_API_KEY:-local-dev-api-key-change-me}
-      CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY: ${CENTRIFUGO_TOKEN_HMAC_SECRET:-local-dev-hmac-secret-change-me}
+      CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY: ${CENTRIFUGO_TOKEN_HMAC_SECRET:-local-dev-hmac-secret-change-me-do-not-use-in-prod-or-with-real-data}
     volumes: ["./docker/centrifugo/config.json:/centrifugo/config.json:ro"]
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     ulimits:
