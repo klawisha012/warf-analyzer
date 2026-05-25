@@ -227,16 +227,16 @@ class WFMClient:
     async def get_profile_orders(self, username: str, *, fresh: bool = False) -> dict[str, Any]:
         """Fetch the authenticated user's listed orders (was profile/{user}/orders).
 
-        v2 endpoint: `/v2/me/orders`. Response shape:
-        `{apiVersion, data: [<order>...], error}` where each order has
-        `{id, type, platinum, quantity, perTrade, visible, itemId, ...}` —
-        same per-order shape as `/v2/orders/item/{slug}` minus the `user`
-        block (it's me).
+        v2 endpoint: `/v2/orders/my` (NOT `/v2/me/orders` — that path 404s).
+        Response shape: `{apiVersion, data: [<order>...], error}` where each
+        order has `{id, type, platinum, quantity, perTrade, visible, itemId,
+        createdAt, updatedAt}` — same per-order shape as
+        `/v2/orders/item/{slug}` minus the `user` block (it's me).
         """
         del username  # unused — v2 doesn't accept a username
         return await self._request(
             "GET",
-            "/me/orders",
+            "/orders/my",
             cache_key="me:orders",
             cache_ttl=_TTL_ORDERS,
             fresh=fresh,

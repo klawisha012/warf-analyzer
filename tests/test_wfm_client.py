@@ -173,10 +173,10 @@ async def test_get_orders_uses_v2_path(client_factory, httpx_mock: HTTPXMock) ->
 
 
 @pytest.mark.asyncio
-async def test_get_profile_orders_hits_v2_me_orders(client_factory, httpx_mock: HTTPXMock) -> None:
-    """v2: /me/orders replaces v1 /profile/{user}/orders; username arg ignored."""
+async def test_get_profile_orders_hits_v2_orders_my(client_factory, httpx_mock: HTTPXMock) -> None:
+    """v2: /orders/my replaces v1 /profile/{user}/orders (NOT /me/orders — 404)."""
     httpx_mock.add_response(
-        url="https://mock.wfm.test/v2/me/orders", method="GET",
+        url="https://mock.wfm.test/v2/orders/my", method="GET",
         json={"apiVersion": "0.23.1", "data": [
             {"id": "o1", "type": "sell", "platinum": 50, "itemId": "iid1", "visible": True},
         ]},
@@ -184,9 +184,9 @@ async def test_get_profile_orders_hits_v2_me_orders(client_factory, httpx_mock: 
     c = client_factory()
     payload = await c.get_profile_orders("ignored-username")
     assert payload["data"][0]["itemId"] == "iid1"
-    # Confirm the request actually went to /v2/me/orders, not the v1 path.
+    # Confirm the request actually went to /v2/orders/my, not the v1 path.
     req = httpx_mock.get_request()
-    assert str(req.url).endswith("/v2/me/orders")
+    assert str(req.url).endswith("/v2/orders/my")
 
 
 @pytest.mark.asyncio
