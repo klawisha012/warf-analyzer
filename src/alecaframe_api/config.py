@@ -52,8 +52,10 @@ class Settings(BaseSettings):
     wfm_language: str = "en"
     wfm_rate_limit_per_second: int = 3
 
-    # uvicorn-only (used by the `run()` entry point in main.py)
-    host: str = "0.0.0.0"
+    # uvicorn-only (used by the `run()` entry point in main.py).
+    # Default 127.0.0.1 is safe for local dev; the backend Dockerfile sets
+    # ALECA_HOST=0.0.0.0 so the container exposes properly.
+    host: str = "127.0.0.1"
     port: int = 8765
     reload: bool = False
 
