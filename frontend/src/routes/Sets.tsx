@@ -4,6 +4,7 @@ import Card from "../components/Card";
 import EmptyState from "../components/EmptyState";
 import SetRowComp from "../components/SetRow";
 import { fetchers, keys } from "../api/queries";
+import { t } from "../i18n";
 
 export default function Sets() {
   const [minMargin, setMinMargin] = createSignal(0);
@@ -16,9 +17,9 @@ export default function Sets() {
   return (
     <div class="space-y-4">
       <header class="flex items-center gap-3 flex-wrap">
-        <h1 class="text-2xl font-bold mr-auto">Buildable sets</h1>
+        <h1 class="text-2xl font-bold mr-auto">{t("sets.title")}</h1>
         <label class="text-sm text-slate-400 flex items-center gap-2">
-          min&nbsp;profit (p)
+          {t("sets.minProfit")}
           <input
             type="number"
             min={0}
@@ -32,14 +33,14 @@ export default function Sets() {
 
       <Show
         when={!sets.isLoading}
-        fallback={<Card><div class="text-slate-500">Loading…</div></Card>}
+        fallback={<Card><div class="text-slate-500">{t("common.loading")}</div></Card>}
       >
         <Show
           when={(sets.data?.items ?? []).length > 0}
           fallback={
             <EmptyState
-              title="No profitable sets"
-              hint="Either set seeds aren't loaded (B.2) or the market doesn't open a gap right now."
+              title={t("sets.empty")}
+              hint={t("sets.emptyHint")}
             />
           }
         >

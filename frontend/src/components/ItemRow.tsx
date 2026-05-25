@@ -3,6 +3,7 @@ import type { PricedItem } from "../api/types";
 import { fmtInt, fmtPlat } from "../lib/format";
 import Badge from "./Badge";
 import PriceCell from "./PriceCell";
+import { t } from "../i18n";
 
 export default function ItemRow(props: { item: PricedItem }) {
   return (
@@ -22,10 +23,10 @@ export default function ItemRow(props: { item: PricedItem }) {
       <td class="py-2 px-3 text-right font-mono">{fmtInt(props.item.count)}</td>
       <td class="py-2 px-3">
         <Show when={props.item.vaulted}>
-          <Badge variant="vaulted">vaulted</Badge>
+          <Badge variant="vaulted">{t("common.vaulted")}</Badge>
         </Show>
         <Show when={props.item.stale}>
-          <Badge variant="warn">stale</Badge>
+          <Badge variant="warn">{t("common.stale")}</Badge>
         </Show>
       </td>
       <td class="py-2 px-3"><PriceCell item={props.item} /></td>

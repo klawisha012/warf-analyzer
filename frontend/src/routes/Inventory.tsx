@@ -5,6 +5,7 @@ import EmptyState from "../components/EmptyState";
 import ItemCard from "../components/ItemCard";
 import { fetchers, keys } from "../api/queries";
 import { useSlugChannel } from "../hooks/useSlugChannel";
+import { t } from "../i18n";
 
 const SLOTS = ["warframe", "primary", "secondary", "melee", "all"] as const;
 type Slot = (typeof SLOTS)[number];
@@ -30,7 +31,7 @@ export default function Inventory() {
   return (
     <div class="space-y-4">
       <header class="flex items-center gap-3 flex-wrap">
-        <h1 class="text-2xl font-bold mr-auto">Inventory</h1>
+        <h1 class="text-2xl font-bold mr-auto">{t("inventory.title")}</h1>
         <div class="flex gap-1">
           <For each={SLOTS}>
             {(s) => (
@@ -43,14 +44,14 @@ export default function Inventory() {
                   "border-slate-800 text-slate-400 hover:text-slate-200": slot() !== s,
                 }}
               >
-                {s}
+                {t(`inventory.slot.${s}`)}
               </button>
             )}
           </For>
         </div>
         <input
           type="search"
-          placeholder="Filter…"
+          placeholder={t("common.filter")}
           value={q()}
           onInput={(e) => setQ(e.currentTarget.value)}
           class="px-3 py-1 text-sm rounded-md bg-slate-900 border border-slate-800 text-slate-100 focus:outline-none focus:border-slate-600"
@@ -59,11 +60,11 @@ export default function Inventory() {
 
       <Show
         when={!items.isLoading}
-        fallback={<Card><div class="text-slate-500">Loading…</div></Card>}
+        fallback={<Card><div class="text-slate-500">{t("common.loading")}</div></Card>}
       >
         <Show
           when={filtered().length > 0}
-          fallback={<EmptyState title="No items" hint="Try a different slot or clear the filter." />}
+          fallback={<EmptyState title={t("inventory.empty")} hint={t("inventory.emptyHint")} />}
         >
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             <For each={filtered()}>{(it) => <ItemCard item={it} />}</For>
