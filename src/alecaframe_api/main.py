@@ -24,7 +24,10 @@ from .infra.cache import Cache
 from .naming import NameResolver
 from .wfm import dependencies as wfm_deps
 from .wfm.client import WFMClient
+from .wfm.auctions_client import WFMAuctionClient
+from .wfm.auction_poller import AuctionPoller
 from .wfm.router import router as wfm_router
+from .wfm.rivens_router import router as rivens_router
 from .infra.broker import RabbitMQBus
 from .infra.push import CentrifugoPublisher
 from .wfm.consumer import handle_live_order
@@ -83,6 +86,7 @@ bridge: AlecaBridge
 resolver: NameResolver
 repo: Repo | None = None
 recipe_uses_idx: dict[str, list[RecipeUse]] = {}
+auctions_client: WFMAuctionClient | None = None
 
 
 @asynccontextmanager
@@ -182,6 +186,24 @@ async def lifespan(app: FastAPI):
         publisher=centrifugo,
     )
     price_poller_task = asyncio.create_task(price_poller.run())
+
+    # Riven auctions live on the v1 host — separate client, separate poller.
+    global auctions_client
+    # base_url derives from wfm_base_url by stripping the /v2 tail (or kept
+    # as-is if it's already v1). docker-compose / .env normally sets v2.
+    v1_base = _settings.wfm_base_url.replace("/v2", "/v1")
+    if not v1_base.endswith("/v1"):
+        v1_base = v1_base.rstrip("/") + "/v1"
+    auctions_client = WFMAuctionClient(
+        cache=Cache(client=redis_client, key_prefix="wfm-auc"),
+        base_url=v1_base, token_provider=_token_provider,
+        platform=_settings.wfm_platform, language=_settings.wfm_language,
+        rate_limit_per_second=_settings.wfm_rate_limit_per_second,
+    )
+    auction_poller = AuctionPoller(
+        repo=repo, client=auctions_client, publisher=centrifugo,
+    )
+    auction_poller_task = asyncio.create_task(auction_poller.run())
     bus = RabbitMQBus(url=_settings.rabbitmq_url)
     _consumer_subscribed = {"v": False}
 
@@ -224,11 +246,15 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     price_poller_task.cancel()
-    try:
-        await price_poller_task
-    except (asyncio.CancelledError, Exception):
-        pass
+    auction_poller_task.cancel()
+    for task in (price_poller_task, auction_poller_task):
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
     await wfm_client.aclose()
+    if auctions_client is not None:
+        await auctions_client.aclose()
     await bus.aclose()
     if repo is not None:
         await repo.close()
@@ -250,6 +276,7 @@ app = FastAPI(
 app.include_router(wfm_router)
 app.include_router(me_router)
 app.include_router(history_router)
+app.include_router(rivens_router)
 
 # ---------------------------------------------------------- helpers / deps
 

@@ -1,0 +1,214 @@
+"""Pure analysis helpers for riven auctions.
+
+Everything in this module is a pure function (no I/O, no async) so the
+poller and the request handlers can use the same logic and the tests stay
+fast. Network access happens in `auctions_client.py`; persistence in
+`db/repo.py`; orchestration in `auction_poller.py`.
+
+Tier classification is data-driven: instead of a curated stat-to-tier
+table per weapon (which would rot the moment WFM disposition changes), we
+let the market tell us what's premium by splitting the live auction list
+into price quartiles. The bottom 25% by buyout becomes "low" (cheap mods
+people sell for kuva-rolling), the top 25% becomes "god" (premium stat
+combos), and the middle 50% is "mid".
+
+Outlier detection compares today's price to the rolling historical median
+of the same tier. Anything below `threshold × median` is flagged — that's
+a mod priced like a low-tier even though it's currently classified as mid
+(or a god-tier mod priced like a mid-tier, etc.).
+"""
+from __future__ import annotations
+
+import statistics
+from collections import Counter
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class TierStats:
+    """Distribution stats for one tier in one snapshot."""
+    count: int
+    min_price: int | None
+    p25: int | None
+    median: int | None
+    p75: int | None
+    max_price: int | None
+
+
+@dataclass(frozen=True)
+class Outlier:
+    """An auction priced significantly below the historical median of its tier."""
+    auction_id: str
+    tier: str
+    price: int
+    historical_median: int
+    discount_pct: int   # 100 * (1 - price/historical_median), rounded
+
+
+def _buyout(a: dict) -> int | None:
+    v = a.get("buyout_price")
+    return int(v) if isinstance(v, (int, float)) else None
+
+
+def classify_tiers(auctions: list[dict]) -> dict[str, list[dict]]:
+    """Split auctions into god/mid/low buckets by buyout price quartile.
+
+    Auctions without a buyout_price are dropped (they're interactive-only and
+    don't fit a single-price comparison).
+    """
+    priced = [a for a in auctions if _buyout(a) is not None]
+    priced.sort(key=lambda a: _buyout(a) or 0)
+    n = len(priced)
+    if n == 0:
+        return {"god": [], "mid": [], "low": []}
+    if n < 4:
+        # Not enough data for quartile split — treat the cheapest as low,
+        # the most expensive as god, anything else as mid.
+        return {
+            "low": priced[:1],
+            "mid": priced[1:-1],
+            "god": priced[-1:] if n > 1 else [],
+        }
+    q1 = n // 4
+    q3 = (3 * n) // 4
+    return {
+        "low": priced[:q1],
+        "mid": priced[q1:q3],
+        "god": priced[q3:],
+    }
+
+
+def compute_tier_stats(auctions: list[dict]) -> TierStats:
+    prices = sorted(_buyout(a) for a in auctions if _buyout(a) is not None)
+    if not prices:
+        return TierStats(count=0, min_price=None, p25=None, median=None, p75=None, max_price=None)
+    return TierStats(
+        count=len(prices),
+        min_price=prices[0],
+        p25=_quantile(prices, 0.25),
+        median=int(statistics.median(prices)),
+        p75=_quantile(prices, 0.75),
+        max_price=prices[-1],
+    )
+
+
+def _quantile(sorted_prices: list[int], q: float) -> int | None:
+    if not sorted_prices:
+        return None
+    if len(sorted_prices) == 1:
+        return sorted_prices[0]
+    cuts = statistics.quantiles(sorted_prices, n=100, method="inclusive")
+    idx = int(round(q * 100)) - 1
+    idx = max(0, min(idx, len(cuts) - 1))
+    return int(round(cuts[idx]))
+
+
+def detect_outliers(
+    auctions: list[dict], *, historical_median: int | None,
+    threshold: float, tier: str,
+) -> list[Outlier]:
+    """Auctions in this tier whose price is below threshold × median.
+
+    `threshold=0.8` means anything ≥20% cheaper than the historical median is
+    flagged. `historical_median` is the value the poller computed from the
+    last 7-30 days of `riven_snapshot` for the same weapon and tier — if no
+    history yet, we return [] (we don't flag against the current snapshot,
+    that would always self-flag the cheapest auction every poll).
+    """
+    if historical_median is None or historical_median <= 0:
+        return []
+    cutoff = threshold * historical_median
+    out: list[Outlier] = []
+    for a in auctions:
+        price = _buyout(a)
+        if price is None or price >= cutoff:
+            continue
+        out.append(Outlier(
+            auction_id=str(a.get("id") or ""),
+            tier=tier, price=price,
+            historical_median=historical_median,
+            discount_pct=int(round(100 * (1 - price / historical_median))),
+        ))
+    return out
+
+
+def summarize_attributes(
+    auctions: list[dict], *, top_n: int = 5,
+) -> list[dict]:
+    """Most common positive attribute names across `auctions` (typically the
+    god-tier slice). Output: `[{name: 'critical_damage', count: 3, share: 1.0}]`
+    sorted by count desc. Tells the user "the expensive mods on this weapon
+    almost all have CD" without any per-weapon configuration.
+    """
+    counter: Counter[str] = Counter()
+    total = 0
+    for a in auctions:
+        total += 1
+        attrs = ((a.get("item") or {}).get("attributes") or [])
+        seen: set[str] = set()
+        for at in attrs:
+            if not at.get("positive"):
+                continue
+            name = at.get("url_name") or at.get("name")
+            if name and name not in seen:
+                counter[name] += 1
+                seen.add(name)
+    if total == 0:
+        return []
+    rows = [
+        {"name": name, "count": cnt, "share": round(cnt / total, 2)}
+        for name, cnt in counter.most_common(top_n)
+    ]
+    return rows
+
+
+def suggest_strategies(
+    *, outliers: list[Outlier], god_tier_count: int,
+    mid_tier_count: int, low_tier_count: int,
+) -> list[dict]:
+    """Translate the current market shape into actionable tips.
+
+    Each tip is `{kind: short-id, ru: text, en: text, severity: info|warn|good}`.
+    Frontend picks language. Kind is used as a stable key — UI may filter or
+    icon them, and tests assert on it.
+    """
+    tips: list[dict] = []
+
+    # Buy-and-flip when there's any current outlier
+    if outliers:
+        best = max(outliers, key=lambda o: o.discount_pct)
+        tips.append({
+            "kind": "buy_flip",
+            "severity": "good",
+            "ru": f"Возможность: лот за {best.price}p (на {best.discount_pct}% ниже median {best.historical_median}p в tier '{best.tier}'). Купи и перевыставь ближе к median.",
+            "en": f"Opportunity: auction at {best.price}p ({best.discount_pct}% under tier '{best.tier}' median of {best.historical_median}p). Buy and relist near median.",
+        })
+
+    # Kuva-roll when the low-tier dominates the listing
+    total = god_tier_count + mid_tier_count + low_tier_count
+    if total > 0 and low_tier_count / total >= 0.4:
+        tips.append({
+            "kind": "kuva_roll",
+            "severity": "info",
+            "ru": "Много дешёвых лотов в low-tier → подходящее время купить под kuva-ролл (кува бесплатна, шанс попасть в god-tier стат).",
+            "en": "Lots of low-tier listings right now → good moment to buy cheap and roll on kuva (free farm, chance to land god-tier stats).",
+        })
+
+    # Disposition / patience reminder when god-tier is very expensive
+    if god_tier_count >= 3:
+        tips.append({
+            "kind": "watch_disposition",
+            "severity": "warn",
+            "ru": "Перед покупкой dorogого riven проверь disposition оружия — после nerf'а цены резко падают.",
+            "en": "Before buying a high-tier riven check the weapon disposition — nerfs crash prices fast.",
+        })
+
+    # Always include one base educational tip so the panel never empties out.
+    tips.append({
+        "kind": "base_education",
+        "severity": "info",
+        "ru": "Stat-комбинации не равны: ищи аукционы с CD+MS+Dam для оружия с high disposition. Топ-стат у этого оружия показан выше.",
+        "en": "Stat combos aren't equal: look for CD+MS+Dam on high-disposition weapons. Top stats for this weapon are shown above.",
+    })
+
+    return tips

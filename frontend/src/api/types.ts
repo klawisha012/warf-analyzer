@@ -136,6 +136,107 @@ export type PricesSnapshotResponse = {
   prices: Record<string, PriceStats>;
 };
 
+// ---------------------------------------------------------------- Rivens
+
+export type RivenAuctionAttribute = {
+  name: string;
+  value: number;
+  positive: boolean;
+};
+
+export type RivenAuctionRow = {
+  auction_id: string;
+  weapon_slug: string;
+  buyout_price: number | null;
+  starting_price: number | null;
+  top_bid: number | null;
+  re_rolls: number | null;
+  mod_rank: number | null;
+  polarity: string | null;
+  owner_name: string | null;
+  tier: string;
+  attributes: RivenAuctionAttribute[];
+};
+
+export type RivenTierStats = {
+  tier: string;
+  count: number;
+  min_price: number | null;
+  p25: number | null;
+  median: number | null;
+  p75: number | null;
+  max_price: number | null;
+};
+
+export type RivenOutlier = {
+  auction_id: string;
+  tier: string;
+  price: number;
+  historical_median: number;
+  discount_pct: number;
+};
+
+export type RivenStrategyTip = {
+  kind: string;
+  severity: "info" | "warn" | "good" | string;
+  ru: string;
+  en: string;
+};
+
+export type RivenTopAttribute = {
+  name: string;
+  count: number;
+  share: number;
+};
+
+export type RivenAuctionsResponse = {
+  weapon_slug: string;
+  fetched_at: string;
+  stale: boolean;
+  tiers: { god: RivenAuctionRow[]; mid: RivenAuctionRow[]; low: RivenAuctionRow[] };
+  stats: RivenTierStats[];
+  outliers: RivenOutlier[];
+  top_attributes: RivenTopAttribute[];
+  strategies: RivenStrategyTip[];
+};
+
+export type RivenWatchEntry = {
+  weapon_slug: string;
+  added_at: number;
+  notes: string | null;
+};
+
+export type RivenWatchlistResponse = { total: number; items: RivenWatchEntry[] };
+
+export type RivenSnapshotRow = {
+  weapon_slug: string;
+  ts: number;
+  tier: string;
+  count: number;
+  min_price: number | null;
+  p25: number | null;
+  median: number | null;
+  p75: number | null;
+  max_price: number | null;
+};
+
+export type RivenHistoryResponse = {
+  weapon_slug: string;
+  tier: string;
+  items: RivenSnapshotRow[];
+};
+
+export type RivenWeapon = {
+  slug: string;
+  item_name: string;
+  icon: string | null;
+  disposition: number | null;
+  riven_type: string | null;
+  group: string | null;
+};
+
+export type RivenWeaponsResponse = { total: number; items: RivenWeapon[] };
+
 export type WtbMatch = {
   slug: string;
   item_name: string;

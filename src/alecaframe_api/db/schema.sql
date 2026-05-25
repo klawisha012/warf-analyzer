@@ -53,3 +53,45 @@ CREATE TABLE IF NOT EXISTS set_compositions (
   qty INTEGER,
   PRIMARY KEY (set_slug, part_slug)
 );
+
+-- Rivens: per-weapon watchlist + auction tracking + tier snapshots.
+
+CREATE TABLE IF NOT EXISTS riven_watchlist (
+  weapon_slug TEXT PRIMARY KEY,
+  added_at    INTEGER NOT NULL,
+  notes       TEXT
+);
+
+CREATE TABLE IF NOT EXISTS riven_snapshot (
+  weapon_slug TEXT NOT NULL,
+  ts          INTEGER NOT NULL,
+  tier        TEXT NOT NULL,         -- 'god' | 'mid' | 'low' | 'all'
+  count       INTEGER NOT NULL,
+  min_price   INTEGER,
+  p25         INTEGER,
+  median      INTEGER,
+  p75         INTEGER,
+  max_price   INTEGER,
+  PRIMARY KEY (weapon_slug, ts, tier)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idx_riven_snapshot_weapon_ts ON riven_snapshot(weapon_slug, ts DESC);
+
+CREATE TABLE IF NOT EXISTS riven_auction (
+  auction_id      TEXT PRIMARY KEY,
+  weapon_slug     TEXT NOT NULL,
+  first_seen      INTEGER NOT NULL,
+  last_seen       INTEGER NOT NULL,
+  buyout_price    INTEGER,
+  starting_price  INTEGER,
+  top_bid         INTEGER,
+  re_rolls        INTEGER,
+  mod_rank        INTEGER,
+  polarity        TEXT,
+  attributes_json TEXT,                -- [{name, value, positive}, ...]
+  owner_name      TEXT,
+  tier            TEXT,                -- our classification at last_seen
+  status          TEXT NOT NULL,       -- 'active' | 'gone'
+  gone_at         INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_riven_auction_weapon ON riven_auction(weapon_slug, status);
+CREATE INDEX IF NOT EXISTS idx_riven_auction_last_seen ON riven_auction(last_seen DESC);

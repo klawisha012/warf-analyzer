@@ -240,3 +240,102 @@ class PriceStatsModel(BaseModel):
 class PricesSnapshotResponse(BaseModel):
     total: int
     prices: dict[str, PriceStatsModel]
+
+
+# ---------------------------------------------------------------- Rivens
+
+
+class RivenAuctionAttribute(BaseModel):
+    name: str
+    value: float | int
+    positive: bool
+
+
+class RivenAuctionRow(BaseModel):
+    auction_id: str
+    weapon_slug: str
+    buyout_price: int | None = None
+    starting_price: int | None = None
+    top_bid: int | None = None
+    re_rolls: int | None = None
+    mod_rank: int | None = None
+    polarity: str | None = None
+    owner_name: str | None = None
+    tier: str
+    attributes: list[RivenAuctionAttribute] = []
+
+
+class RivenTierStats(BaseModel):
+    tier: str
+    count: int
+    min_price: int | None = None
+    p25: int | None = None
+    median: int | None = None
+    p75: int | None = None
+    max_price: int | None = None
+
+
+class RivenOutlier(BaseModel):
+    auction_id: str
+    tier: str
+    price: int
+    historical_median: int
+    discount_pct: int
+
+
+class RivenStrategyTip(BaseModel):
+    kind: str
+    severity: str
+    ru: str
+    en: str
+
+
+class RivenTopAttribute(BaseModel):
+    name: str
+    count: int
+    share: float
+
+
+class RivenAuctionsResponse(BaseModel):
+    weapon_slug: str
+    fetched_at: str
+    stale: bool = False
+    tiers: dict[str, list[RivenAuctionRow]]      # 'god' | 'mid' | 'low'
+    stats: list[RivenTierStats]                  # one per tier + 'all'
+    outliers: list[RivenOutlier]
+    top_attributes: list[RivenTopAttribute]
+    strategies: list[RivenStrategyTip]
+
+
+class RivenWatchEntry(BaseModel):
+    weapon_slug: str
+    added_at: int
+    notes: str | None = None
+
+
+class RivenWatchlistResponse(BaseModel):
+    total: int
+    items: list[RivenWatchEntry]
+
+
+class RivenWatchAddRequest(BaseModel):
+    weapon_slug: str
+    notes: str | None = None
+
+
+class RivenSnapshotRow(BaseModel):
+    weapon_slug: str
+    ts: int
+    tier: str
+    count: int
+    min_price: int | None = None
+    p25: int | None = None
+    median: int | None = None
+    p75: int | None = None
+    max_price: int | None = None
+
+
+class RivenHistoryResponse(BaseModel):
+    weapon_slug: str
+    tier: str
+    items: list[RivenSnapshotRow]

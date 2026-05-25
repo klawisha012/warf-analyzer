@@ -27,3 +27,4 @@ frontend/.vite
 
 # Env files
 .env
+.superpowers/

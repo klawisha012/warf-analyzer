@@ -177,3 +177,163 @@ class Repo:
             (ts, slug, event_type, json.dumps(payload)),
         )
         await conn.commit()
+
+    # ----------------------------------------------------------- rivens
+
+    async def add_riven_watch(
+        self, weapon_slug: str, *, ts: int, notes: str | None = None,
+    ) -> None:
+        """Add a weapon to the riven watchlist; idempotent (re-adding leaves
+        the row alone — we use INSERT OR IGNORE so the original `added_at`
+        timestamp is preserved)."""
+        conn = self._require_conn()
+        await conn.execute(
+            """INSERT OR IGNORE INTO riven_watchlist (weapon_slug, added_at, notes)
+               VALUES (?, ?, ?)""",
+            (weapon_slug, ts, notes),
+        )
+        await conn.commit()
+
+    async def list_riven_watch(self) -> list[dict[str, Any]]:
+        conn = self._require_conn()
+        async with conn.execute(
+            "SELECT weapon_slug, added_at, notes FROM riven_watchlist ORDER BY added_at DESC"
+        ) as cursor:
+            cols = [c[0] for c in cursor.description]
+            rows = await cursor.fetchall()
+        return [dict(zip(cols, r)) for r in rows]
+
+    async def remove_riven_watch(self, weapon_slug: str) -> bool:
+        conn = self._require_conn()
+        cur = await conn.execute(
+            "DELETE FROM riven_watchlist WHERE weapon_slug = ?", (weapon_slug,),
+        )
+        await conn.commit()
+        return (cur.rowcount or 0) > 0
+
+    async def write_riven_snapshot(
+        self, *, weapon_slug: str, ts: int, tier: str, count: int,
+        min_price: int | None, p25: int | None, median: int | None,
+        p75: int | None, max_price: int | None,
+    ) -> None:
+        conn = self._require_conn()
+        await conn.execute(
+            """INSERT OR REPLACE INTO riven_snapshot
+               (weapon_slug, ts, tier, count, min_price, p25, median, p75, max_price)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (weapon_slug, ts, tier, count, min_price, p25, median, p75, max_price),
+        )
+        await conn.commit()
+
+    async def riven_snapshot_history(
+        self, *, weapon_slug: str, tier: str, since_ts: int, limit: int = 5000,
+    ) -> list[dict[str, Any]]:
+        conn = self._require_conn()
+        async with conn.execute(
+            """SELECT * FROM riven_snapshot
+               WHERE weapon_slug=? AND tier=? AND ts >= ?
+               ORDER BY ts DESC LIMIT ?""",
+            (weapon_slug, tier, since_ts, limit),
+        ) as cursor:
+            cols = [c[0] for c in cursor.description]
+            rows = await cursor.fetchall()
+        return [dict(zip(cols, r)) for r in rows]
+
+    async def upsert_riven_auction(
+        self, *, auction_id: str, weapon_slug: str, seen_at: int,
+        buyout_price: int | None, starting_price: int | None, top_bid: int | None,
+        re_rolls: int | None, mod_rank: int | None, polarity: str | None,
+        attributes: list[dict[str, Any]], owner_name: str | None, tier: str,
+    ) -> None:
+        """Insert a new active auction or update an existing one's last_seen +
+        mutable fields (price/tier). Preserves first_seen on update."""
+        conn = self._require_conn()
+        attrs_json = json.dumps(attributes)
+        await conn.execute(
+            """INSERT INTO riven_auction (
+                 auction_id, weapon_slug, first_seen, last_seen,
+                 buyout_price, starting_price, top_bid,
+                 re_rolls, mod_rank, polarity, attributes_json,
+                 owner_name, tier, status, gone_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NULL)
+               ON CONFLICT(auction_id) DO UPDATE SET
+                 last_seen      = excluded.last_seen,
+                 buyout_price   = excluded.buyout_price,
+                 starting_price = excluded.starting_price,
+                 top_bid        = excluded.top_bid,
+                 tier           = excluded.tier,
+                 status         = 'active',
+                 gone_at        = NULL""",
+            (auction_id, weapon_slug, seen_at, seen_at,
+             buyout_price, starting_price, top_bid,
+             re_rolls, mod_rank, polarity, attrs_json,
+             owner_name, tier),
+        )
+        await conn.commit()
+
+    async def mark_riven_auctions_gone(
+        self, *, weapon_slug: str, seen_ids: set[str], at: int,
+    ) -> int:
+        """Flip any currently-active auction for `weapon_slug` to 'gone' if
+        it isn't present in `seen_ids`. Returns the number of rows flipped."""
+        conn = self._require_conn()
+        if not seen_ids:
+            cur = await conn.execute(
+                """UPDATE riven_auction SET status='gone', gone_at=?
+                   WHERE weapon_slug=? AND status='active'""",
+                (at, weapon_slug),
+            )
+        else:
+            placeholders = ",".join("?" * len(seen_ids))
+            cur = await conn.execute(
+                f"""UPDATE riven_auction SET status='gone', gone_at=?
+                    WHERE weapon_slug=? AND status='active'
+                      AND auction_id NOT IN ({placeholders})""",
+                (at, weapon_slug, *seen_ids),
+            )
+        await conn.commit()
+        return cur.rowcount or 0
+
+    async def active_riven_auctions(self, weapon_slug: str) -> list[dict[str, Any]]:
+        conn = self._require_conn()
+        async with conn.execute(
+            """SELECT * FROM riven_auction
+               WHERE weapon_slug=? AND status='active'
+               ORDER BY buyout_price ASC""",
+            (weapon_slug,),
+        ) as cursor:
+            cols = [c[0] for c in cursor.description]
+            rows = await cursor.fetchall()
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            d = dict(zip(cols, r))
+            try:
+                d["attributes"] = json.loads(d.pop("attributes_json") or "[]")
+            except Exception:
+                d["attributes"] = []
+            out.append(d)
+        return out
+
+    async def recent_gone_riven_auctions(
+        self, weapon_slug: str, *, since_ts: int, limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        """Auctions that disappeared (likely sold) since `since_ts`. Useful
+        for inferring real sale prices vs listing prices."""
+        conn = self._require_conn()
+        async with conn.execute(
+            """SELECT * FROM riven_auction
+               WHERE weapon_slug=? AND status='gone' AND gone_at >= ?
+               ORDER BY gone_at DESC LIMIT ?""",
+            (weapon_slug, since_ts, limit),
+        ) as cursor:
+            cols = [c[0] for c in cursor.description]
+            rows = await cursor.fetchall()
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            d = dict(zip(cols, r))
+            try:
+                d["attributes"] = json.loads(d.pop("attributes_json") or "[]")
+            except Exception:
+                d["attributes"] = []
+            out.append(d)
+        return out

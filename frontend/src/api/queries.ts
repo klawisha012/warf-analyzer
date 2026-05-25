@@ -6,6 +6,10 @@ import type {
   PricesSnapshotResponse,
   RefreshResponse,
   RelistNudgeResponse,
+  RivenAuctionsResponse,
+  RivenHistoryResponse,
+  RivenWatchlistResponse,
+  RivenWeaponsResponse,
   SetProfitResponse,
   WFMItemsResponse,
   WtbMatchResponse,
@@ -24,6 +28,10 @@ export const keys = {
   meSetsProfit:   (min_margin: number) => ["me", "sets-profit", min_margin] as const,
   meWtbMatches:   (min_offer: number) => ["me", "wtb-matches", min_offer] as const,
   meRelistNudges: () => ["me", "relist-nudges"] as const,
+  rivenAuctions:  (slug: string) => ["rivens", "auctions", slug] as const,
+  rivenWatchlist: () => ["rivens", "watchlist"] as const,
+  rivenHistory:   (slug: string, tier: string, days: number) => ["rivens", "history", slug, tier, days] as const,
+  rivenWeapons:   () => ["rivens", "weapons"] as const,
 };
 
 export const fetchers = {
@@ -45,4 +53,18 @@ export const fetchers = {
   refresh: () => api<RefreshResponse>("/refresh", { method: "POST" }),
   prices: (slugs: string[]) =>
     api<PricesSnapshotResponse>(`/prices?slugs=${encodeURIComponent(slugs.join(","))}`),
+  rivenAuctions: (slug: string, fresh = false) =>
+    api<RivenAuctionsResponse>(`/rivens/auctions/${encodeURIComponent(slug)}${fresh ? "?fresh=1" : ""}`),
+  rivenWatchlist: () => api<RivenWatchlistResponse>("/rivens/watchlist"),
+  rivenWatchAdd: (slug: string, notes?: string) =>
+    api<RivenWatchlistResponse>("/rivens/watchlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weapon_slug: slug, notes }),
+    }),
+  rivenWatchRemove: (slug: string) =>
+    api<{ removed: string }>(`/rivens/watchlist/${encodeURIComponent(slug)}`, { method: "DELETE" }),
+  rivenHistory: (slug: string, tier = "all", days = 7) =>
+    api<RivenHistoryResponse>(`/rivens/history/${encodeURIComponent(slug)}?tier=${tier}&days=${days}`),
+  rivenWeapons: () => api<RivenWeaponsResponse>("/rivens/weapons"),
 };
