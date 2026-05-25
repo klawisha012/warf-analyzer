@@ -4,6 +4,7 @@ import Card from "../components/Card";
 import EmptyState from "../components/EmptyState";
 import ItemCard from "../components/ItemCard";
 import { fetchers, keys } from "../api/queries";
+import { useSlugChannel } from "../hooks/useSlugChannel";
 
 const SLOTS = ["warframe", "primary", "secondary", "melee", "all"] as const;
 type Slot = (typeof SLOTS)[number];
@@ -23,6 +24,8 @@ export default function Inventory() {
     const all = items.data?.items ?? [];
     return needle ? all.filter((x) => x.name.toLowerCase().includes(needle)) : all;
   });
+
+  useSlugChannel(() => filtered().slice(0, 10).map((it) => it.slug).filter(Boolean) as string[]);
 
   return (
     <div class="space-y-4">

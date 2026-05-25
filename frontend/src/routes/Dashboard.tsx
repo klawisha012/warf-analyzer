@@ -5,6 +5,7 @@ import Badge from "../components/Badge";
 import EmptyState from "../components/EmptyState";
 import { fetchers, keys } from "../api/queries";
 import { fmtPlat, fmtInt } from "../lib/format";
+import { useSlugChannel } from "../hooks/useSlugChannel";
 
 export default function Dashboard() {
   const health = createQuery(() => ({
@@ -24,6 +25,11 @@ export default function Dashboard() {
     queryKey: keys.meRelistNudges(),
     queryFn:  fetchers.meRelistNudges,
   }));
+
+  useSlugChannel(() => [
+    ...(wtb.data?.items ?? []).map((m) => m.slug),
+    ...(nudges.data?.items ?? []).map((n) => n.slug),
+  ].filter(Boolean) as string[]);
 
   return (
     <div class="space-y-6">

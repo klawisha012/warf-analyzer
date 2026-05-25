@@ -5,6 +5,7 @@ import EmptyState from "../components/EmptyState";
 import ItemRow from "../components/ItemRow";
 import { fetchers, keys } from "../api/queries";
 import { fmtPlat } from "../lib/format";
+import { useSlugChannel } from "../hooks/useSlugChannel";
 
 export default function PrimeParts() {
   const [minCount, setMinCount] = createSignal(1);
@@ -24,6 +25,8 @@ export default function PrimeParts() {
   const totalValue = createMemo(() =>
     filtered().reduce((sum, it) => sum + (it.estimated_value ?? 0), 0),
   );
+
+  useSlugChannel(() => filtered().slice(0, 10).map((it) => it.slug).filter(Boolean) as string[]);
 
   return (
     <div class="space-y-4">
