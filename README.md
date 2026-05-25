@@ -126,6 +126,24 @@ Auth: backend минтит JWT (`POST /api/me/centrifugo-token`), Centrifugo п�
 При выключённой RabbitMQ backend стартует с warning, live-updates не работают, но REST
 работает как раньше.
 
+## History + signals (B.2a)
+
+SQLite history database at `data/wfm_history.db` accumulates price snapshots
+каждые 30 минут (top 20 подписанных slugs). 9 signal types fire on snapshots
+or live events; dedup by `signal_type:slug:date`.
+
+New endpoints:
+- `GET /history/{slug}?days=30&granularity=hour|day&side=sell|buy&online_only=true`
+- `GET /signals/active?type=undervalued_mine&since_hours=24&limit=50`
+- `GET /signals/feed?since=<ts>&limit=50`
+- `GET /me/dashboard-actions?limit=10` — top-10 ranked todos by signal priority
+
+Set compositions loaded at first startup from `%LOCALAPPDATA%\AlecaFrame\cachedData\json\Warframes.json`
+etc. — replaces the Kronen-only seed from B.1a.
+
+При выключённом RabbitMQ history накапливается только из poller-snapshots
+(каждые 30 мин), без live audit-trail.
+
 ## Разработка фронта вне docker
 
 В docker-compose фронт собран и отдаётся через nginx. Для быстрого
