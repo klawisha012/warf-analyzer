@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import time
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -17,9 +17,9 @@ async def history(
     repo: RepoDep,
     resolver: SlugResolverDep,
     days: Annotated[int, Query(ge=1, le=90)] = 30,
-    granularity: Annotated[str, Query(description="hour | day")] = "hour",
+    granularity: Annotated[Literal["hour", "day"], Query()] = "hour",
     online_only: Annotated[bool, Query()] = True,
-    side: Annotated[str, Query(description="sell | buy")] = "sell",
+    side: Annotated[Literal["sell", "buy"], Query()] = "sell",
 ) -> dict[str, Any]:
     if resolver.by_slug(slug) is None:
         raise HTTPException(404, f"unknown slug '{slug}'")

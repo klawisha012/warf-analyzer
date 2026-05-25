@@ -132,7 +132,8 @@ def bid_match(ctx: SignalContext) -> SignalEvent | None:
             dedup_key=f"bid_match:{ctx.slug}:{_today_iso(ctx.now_ts)}:{ctx.current_buy.max_price}",
         )
     if not floor and ctx.current_buy.max_price:
-        # No live sell side at all but someone wants to buy — interesting.
+        # No usable sell floor (either no sell side at all OR all sell orders were
+        # filtered out leaving min_price=None) but a buyer wants in — interesting.
         return SignalEvent(
             slug=ctx.slug, ts=ctx.now_ts, signal_type="bid_match",
             payload={"offer_price": ctx.current_buy.max_price, "floor": None},

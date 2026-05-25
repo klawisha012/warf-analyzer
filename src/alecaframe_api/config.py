@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     # behaviour
     ttl_seconds: int = 60
     log_level: str = "INFO"
-    signal_throttle_seconds: int = 3600
+    signal_throttle_seconds: int = 3600  # consumed by B.3 alert-rules engine (not B.2a)
 
     # warframe.market specifics
     wfm_base_url: str = "https://api.warframe.market/v1"

@@ -116,3 +116,56 @@ def test_run_signals_returns_list_of_events() -> None:
     types = {e.signal_type for e in events}
     assert "competitor_undercut" in types
     assert "bid_match" in types
+
+
+def test_vault_premium_fires_on_vaulted_item_above_baseline() -> None:
+    """Vaulted item with current median > 1.5 × history median fires."""
+    now = int(time.time())
+    history = [_snap(ts=now - 86400 * d, median=20) for d in range(1, 8)]  # 7 days, median 20
+    ctx = SignalContext(
+        slug="x", now_ts=now, history_7d=history,
+        current_sell=_snap(ts=now, median=35),  # 35 > 20 * 1.5 = 30 → fires
+        current_buy=None, my_listing_price=None,
+        is_vaulted=True,
+    )
+    ev = vault_premium(ctx)
+    assert ev is not None
+    assert ev.payload["current_median"] == 35
+    assert ev.payload["baseline"] == 20
+
+
+def test_vault_premium_silent_when_not_vaulted() -> None:
+    """Same conditions but is_vaulted=False (or None) → no signal."""
+    now = int(time.time())
+    history = [_snap(ts=now - 86400 * d, median=20) for d in range(1, 8)]
+    ctx = SignalContext(
+        slug="x", now_ts=now, history_7d=history,
+        current_sell=_snap(ts=now, median=35),
+        current_buy=None, my_listing_price=None,
+        is_vaulted=None,
+    )
+    assert vault_premium(ctx) is None
+
+
+def test_set_profit_window_fires_when_parts_cheaper_than_set() -> None:
+    """parts_cost < set_price * 0.85 → fires."""
+    now = int(time.time())
+    ctx = SignalContext(
+        slug="kronen_prime_blade", now_ts=now, history_7d=[],
+        current_sell=None, current_buy=None, my_listing_price=None,
+        set_context={"set_slug": "kronen_prime_set", "parts_cost": 60, "set_price": 100},  # 60 < 85
+    )
+    ev = set_profit_window(ctx)
+    assert ev is not None
+    assert ev.slug == "kronen_prime_set"  # event is about the SET, not the part being processed
+    assert ev.payload["profit_pct"] == 40.0
+
+
+def test_set_profit_window_silent_without_context() -> None:
+    """No set_context → no signal."""
+    now = int(time.time())
+    ctx = SignalContext(
+        slug="x", now_ts=now, history_7d=[],
+        current_sell=None, current_buy=None, my_listing_price=None,
+    )
+    assert set_profit_window(ctx) is None
