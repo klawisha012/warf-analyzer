@@ -12,13 +12,16 @@ FIXTURE = Path(__file__).parent / "fixtures" / "wfm_items_sample.json"
 
 
 def load_items() -> list[ItemRef]:
+    """Parse the v2-shaped fixture into ItemRef[] the same way client.get_items does."""
     raw = json.loads(FIXTURE.read_text(encoding="utf-8"))
-    return [
-        ItemRef(slug=it["url_name"], item_name=it["item_name"],
-                thumb_url=it.get("thumb"), vaulted=bool(it.get("vaulted", False)),
-                wfm_id=it["id"])
-        for it in raw["payload"]["items"]
-    ]
+    out: list[ItemRef] = []
+    for it in raw["data"]:
+        en = (it.get("i18n") or {}).get("en") or {}
+        out.append(ItemRef(
+            slug=it["slug"], item_name=en.get("name") or it["slug"],
+            thumb_url=en.get("thumb"), vaulted=None, wfm_id=it["id"],
+        ))
+    return out
 
 
 @pytest.fixture
@@ -32,7 +35,8 @@ def test_lookup_by_slug(resolver: SlugResolver) -> None:
     it = resolver.by_slug("kronen_prime_blade")
     assert it is not None
     assert it.item_name == "Kronen Prime Blade"
-    assert it.vaulted is True
+    # v2 listing omits vaulted; legacy "Kronen Prime Blade is vaulted" lives elsewhere now.
+    assert it.vaulted is None
 
 
 def test_lookup_missing_slug_returns_none(resolver: SlugResolver) -> None:

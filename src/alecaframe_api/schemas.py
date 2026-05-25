@@ -208,7 +208,9 @@ class WFMItemRef(BaseModel):
     slug: str
     item_name: str
     thumb_url: str | None
-    vaulted: bool
+    # v2 listing omits vaulted — only the per-item /v2/items/{slug} endpoint
+    # carries it. Lifted to Optional so callers can distinguish "unknown" from "live".
+    vaulted: bool | None = None
     wfm_id: str
 
 

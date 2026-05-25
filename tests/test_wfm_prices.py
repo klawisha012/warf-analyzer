@@ -12,7 +12,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "wfm_orders_kronen_prime_blade.js
 
 
 def load_orders() -> list[dict]:
-    return json.loads(FIXTURE.read_text(encoding="utf-8"))["payload"]["orders"]
+    return json.loads(FIXTURE.read_text(encoding="utf-8"))["data"]
 
 
 def test_compute_stats_sell_online_only() -> None:
@@ -73,9 +73,8 @@ def test_compute_stats_percentiles_are_monotonic() -> None:
 def test_compute_stats_handles_non_pc_platform_filter() -> None:
     """If the fixture had xbox orders mixed in, the helper should accept a platform filter."""
     orders = load_orders() + [
-        {"order_type": "sell", "platinum": 999, "quantity": 1,
-         "user": {"ingame_name": "xbox_a", "status": "online", "reputation": 0},
-         "platform": "xbox"},
+        {"id": "x", "type": "sell", "platinum": 999, "quantity": 1, "visible": True,
+         "user": {"ingameName": "xbox_a", "status": "online", "reputation": 0, "platform": "xbox"}},
     ]
     stats = compute_stats(orders, side="sell", online_only=False, platform="pc")
     assert stats.max_price == 60  # xbox 999 not counted

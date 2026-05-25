@@ -118,63 +118,88 @@ class WFMClient:
     # ----------------------------------------------------------- typed methods
 
     async def get_items(self) -> list[ItemRef]:
+        """Fetch the WFM v2 item catalogue and project into ItemRef.
+
+        v2 listing shape: `{apiVersion, data: [{id, slug, gameRef, tags,
+        i18n: {en: {name, icon, thumb}}}]}`. Fields `vaulted`, `ducats`,
+        `reqMasteryRank` are only on the per-item `/v2/items/{slug}` endpoint,
+        not the bulk listing.
+        """
         payload = await self._request(
             "GET", "/items",
             cache_key="items",
             cache_ttl=_TTL_ITEMS,
         )
-        items = payload.get("payload", {}).get("items", [])
-        return [
-            ItemRef(
-                slug=it["url_name"],
-                item_name=it["item_name"],
-                thumb_url=it.get("thumb"),
-                vaulted=bool(it.get("vaulted", False)),
-                wfm_id=it["id"],
+        items = payload.get("data") or []
+        out: list[ItemRef] = []
+        for it in items:
+            en = (it.get("i18n") or {}).get(self.language) or (it.get("i18n") or {}).get("en") or {}
+            out.append(
+                ItemRef(
+                    slug=it["slug"],
+                    item_name=en.get("name") or it["slug"],
+                    thumb_url=en.get("thumb"),
+                    vaulted=None,  # not in v2 listing; resolve per-item if needed
+                    wfm_id=it["id"],
+                )
             )
-            for it in items
-        ]
+        return out
 
     async def get_orders(
         self,
         slug: str,
         *,
-        include_item_info: bool = False,
+        include_item_info: bool = False,  # legacy kwarg, no v2 equivalent
         fresh: bool = False,
     ) -> dict[str, Any]:
-        params = {"include": "item"} if include_item_info else None
+        """Fetch all live orders for a slug.
+
+        v2 endpoint: `/v2/orders/item/{slug}` (was `/v1/items/{slug}/orders`).
+        v2 response: `{apiVersion, data: [{id, type, platinum, quantity,
+        perTrade, visible, createdAt, updatedAt, itemId, user: {id,
+        ingameName, slug, avatar, reputation, platform, crossplay, locale,
+        status, activity, lastSeen}}]}`.
+
+        Returned shape is normalised to `{"data": [...]}` so callers can do
+        `payload.get("data") or []` consistently.
+        """
+        # include_item_info kept for backwards-compat; v2 always includes itemId
+        # but not the embedded item dict — we drop the kwarg silently.
+        del include_item_info
         return await self._request(
             "GET",
-            f"/items/{slug}/orders",
-            cache_key=f"orders:{slug}:{int(include_item_info)}",
+            f"/orders/item/{slug}",
+            cache_key=f"orders:{slug}",
             cache_ttl=_TTL_ORDERS,
             fresh=fresh,
-            params=params,
         )
 
     async def get_profile(self, username: str, *, fresh: bool = False) -> dict[str, Any]:
-        return await self._request(
-            "GET",
-            f"/profile/{username}",
-            cache_key=f"profile:{username}",
-            cache_ttl=_TTL_PROFILE,
-            fresh=fresh,
+        """NOT MIGRATED to v2 yet — /v2/profile/{user} returns 404.
+
+        Callers should expect WFMError; routers that depend on this should
+        raise 503 with a clear message until the v2 path is published.
+        """
+        raise WFMError(
+            "WFM /profile not migrated to v2 yet; tracked as follow-up. "
+            "Original v1 path is dead."
         )
 
     async def get_profile_orders(self, username: str, *, fresh: bool = False) -> dict[str, Any]:
-        return await self._request(
-            "GET",
-            f"/profile/{username}/orders",
-            cache_key=f"profile-orders:{username}",
-            cache_ttl=_TTL_ORDERS,
-            fresh=fresh,
+        """NOT MIGRATED to v2 yet — see get_profile."""
+        raise WFMError(
+            "WFM /profile/{user}/orders not migrated to v2 yet; tracked as "
+            "follow-up. Original v1 path is dead."
         )
 
     async def get_statistics(self, slug: str, *, fresh: bool = False) -> dict[str, Any]:
-        return await self._request(
-            "GET",
-            f"/items/{slug}/statistics",
-            cache_key=f"statistics:{slug}",
-            cache_ttl=_TTL_STATISTICS,
-            fresh=fresh,
+        """NOT MIGRATED to v2 yet — /v2/items/{slug}/statistics returns 404.
+
+        The 90-day OHLCV statistics endpoint may have been removed or moved;
+        no public v2 path was found. B.2a's history table replaces most of
+        what this endpoint provided.
+        """
+        raise WFMError(
+            "WFM /items/{slug}/statistics not available in v2; use the "
+            "B.2a SQLite history table via /history/{slug} instead."
         )

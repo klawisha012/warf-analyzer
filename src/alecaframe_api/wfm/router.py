@@ -69,10 +69,10 @@ def _stats_to_model(s) -> OrderBookStatsModel:
 def _order_to_row(o: dict) -> OrderRow:
     user = o.get("user") or {}
     return OrderRow(
-        side=o.get("order_type", ""),
+        side=o.get("type", ""),
         price=int(o.get("platinum", 0)),
         qty=int(o.get("quantity", 1) or 1),
-        user=str(user.get("ingame_name") or ""),
+        user=str(user.get("ingameName") or ""),
         status=str(user.get("status") or "unknown"),
         reputation=int(user.get("reputation", 0) or 0),
         platform=str(o.get("platform", "pc")),
@@ -142,12 +142,12 @@ async def wfm_orders(
         payload = await client.get_orders(slug, fresh=fresh)
     except WFMError as e:
         raise HTTPException(503, str(e)) from e
-    orders = payload.get("payload", {}).get("orders", []) or []
+    orders = payload.get("data") or []
     online_only = not include_offline
     sell = compute_stats(orders, side="sell", online_only=online_only)
     buy = compute_stats(orders, side="buy", online_only=online_only)
     top = sorted(
-        (o for o in orders if o.get("order_type") == "sell"),
+        (o for o in orders if o.get("type") == "sell"),
         key=lambda o: int(o.get("platinum", 0)),
     )[:10]
     return OrderBookResponse(
@@ -177,7 +177,7 @@ async def _floor_for(client, slug: str, *, online_only: bool) -> int | None:
         payload = await client.get_orders(slug)
     except WFMError:
         return None
-    orders = payload.get("payload", {}).get("orders", []) or []
+    orders = payload.get("data") or []
     stats = compute_stats(orders, side="sell", online_only=online_only)
     return stats.min_price
 
@@ -239,7 +239,7 @@ async def me_inventory_priced(
             vaulted = ref.vaulted if ref else None
             try:
                 payload = await client.get_orders(slug)
-                orders = payload.get("payload", {}).get("orders", []) or []
+                orders = payload.get("data") or []
                 sell = compute_stats(orders, side="sell", online_only=True)
                 buy = compute_stats(orders, side="buy", online_only=True)
                 sell_min, sell_median = sell.min_price, sell.median
@@ -297,7 +297,7 @@ async def me_prime_parts_priced(
             vaulted = ref.vaulted if ref else None
             try:
                 payload = await client.get_orders(slug)
-                orders = payload.get("payload", {}).get("orders", []) or []
+                orders = payload.get("data") or []
                 sell = compute_stats(orders, side="sell", online_only=True)
                 buy = compute_stats(orders, side="buy", online_only=True)
                 sell_min, sell_median = sell.min_price, sell.median
@@ -395,22 +395,22 @@ async def me_wtb_matches(
             payload = await client.get_orders(slug)
         except WFMError:
             continue
-        orders = payload.get("payload", {}).get("orders", []) or []
+        orders = payload.get("data") or []
         ref = slug_resolver.by_slug(slug)
         for o in orders:
-            if o.get("order_type") != "buy" or o.get("platform") != "pc":
+            user = o.get("user") or {}
+            if o.get("type") != "buy" or user.get("platform") != "pc":
                 continue
-            status = (o.get("user") or {}).get("status")
+            status = user.get("status")
             if status not in {"ingame", "online"}:
                 continue
             price = int(o.get("platinum", 0))
             if price < min_offer:
                 continue
-            user = o.get("user") or {}
             matches.append(WtbMatchRow(
                 slug=slug, item_name=(ref.item_name if ref else slug),
                 your_qty=qty,
-                buyer=str(user.get("ingame_name") or ""),
+                buyer=str(user.get("ingameName") or ""),
                 buyer_status=str(status),
                 buyer_reputation=int(user.get("reputation", 0) or 0),
                 offer_price=price,
@@ -450,7 +450,7 @@ async def me_relist_nudges(
             payload = await client.get_orders(slug)
         except WFMError:
             continue
-        orders = payload.get("payload", {}).get("orders", []) or []
+        orders = payload.get("data") or []
         sell = compute_stats(orders, side="sell", online_only=True)
         top5 = sell.top5 or []
         suggestion = ""

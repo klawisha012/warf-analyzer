@@ -3,7 +3,7 @@
 WFM uses slugs like `kronen_prime_blade`. DE uniqueNames are paths like
 `/Lotus/Types/Recipes/Weapons/WeaponParts/KronenPrimeBlade`. The resolver:
 
-1. Loads the WFM /v1/items catalogue once (passed in via `load()`).
+1. Loads the WFM /v2/items catalogue once (passed in via `load()`).
 2. Builds a forward index `slug -> ItemRef`.
 3. Resolves uniqueNames by stripping known path prefixes and reversing
    CamelCase → snake_case on the trailing segment.
@@ -25,7 +25,9 @@ class ItemRef:
     slug: str            # e.g. "kronen_prime_blade"
     item_name: str       # e.g. "Kronen Prime Blade"
     thumb_url: str | None
-    vaulted: bool
+    # v2 listing omits vaulted; it's only on the per-item detail endpoint.
+    # Lifted to Optional so unknown ≠ False.
+    vaulted: bool | None
     wfm_id: str          # WFM internal id
 
 
@@ -83,7 +85,7 @@ class SlugResolver:
     # ---------------------------------------------------------------- ingest
 
     def load(self, items: list[ItemRef]) -> None:
-        """Replace the catalogue. Called at startup with the WFM /v1/items response."""
+        """Replace the catalogue. Called at startup with the WFM /v2/items response."""
         with self._lock:
             self._by_slug = {it.slug: it for it in items}
 

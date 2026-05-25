@@ -40,7 +40,7 @@ def test_env_overrides_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_wfm_base_url_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("ALECA_WFM_BASE_URL", raising=False)
     s = reload_settings()
-    assert s.wfm_base_url == "https://api.warframe.market/v1"
+    assert s.wfm_base_url == "https://api.warframe.market/v2"
 
 
 def test_wfm_base_url_override(monkeypatch: pytest.MonkeyPatch) -> None:

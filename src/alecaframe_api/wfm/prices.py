@@ -1,8 +1,14 @@
 """Order-book aggregations.
 
-Takes a raw WFM /orders payload (list of dicts), filters by side / online /
-platform, and computes a typed stats record: min/p10/p25/median/p75/p90/max,
-order count, total quantity, top 5 prices.
+Takes a raw WFM v2 orders list (list of dicts from
+`/v2/orders/item/{slug}` `.data`), filters by side / online / platform, and
+computes a typed stats record: min/p10/p25/median/p75/p90/max, order count,
+total quantity, top 5 prices.
+
+v2 per-order shape: `{type: "sell"|"buy", platinum: int, quantity: int,
+visible: bool, user: {status: "ingame"|"online"|"offline", platform: "pc"|...,
+ingameName: str, ...}}`. Note v1's top-level `order_type` and `platform`
+moved to `type` and `user.platform`.
 """
 from __future__ import annotations
 
@@ -47,15 +53,19 @@ def compute_stats(
     online_only: bool,
     platform: str = "pc",
 ) -> OrderBookStats:
-    """Aggregate a raw WFM /orders payload into a single stats record."""
+    """Aggregate a raw WFM v2 orders list into a single stats record."""
     filtered: list[dict] = []
     for o in orders:
-        if o.get("order_type") != side:
+        if o.get("type") != side:
             continue
-        if o.get("platform") != platform:
+        user = o.get("user") or {}
+        if user.get("platform") != platform:
+            continue
+        # v2 adds `visible` — invisible orders are paused listings, skip them.
+        if o.get("visible") is False:
             continue
         if online_only:
-            status = (o.get("user") or {}).get("status")
+            status = user.get("status")
             if status not in {"ingame", "online"}:
                 continue
         filtered.append(o)

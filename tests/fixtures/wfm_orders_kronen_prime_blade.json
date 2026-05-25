@@ -1,16 +1,25 @@
 {
-  "payload": {
-    "orders": [
-      {"order_type": "sell", "platinum": 35, "quantity": 1, "user": {"ingame_name": "trader_a", "status": "ingame", "reputation": 120}, "platform": "pc"},
-      {"order_type": "sell", "platinum": 36, "quantity": 2, "user": {"ingame_name": "trader_b", "status": "online", "reputation": 75},  "platform": "pc"},
-      {"order_type": "sell", "platinum": 38, "quantity": 1, "user": {"ingame_name": "trader_c", "status": "online", "reputation": 12},  "platform": "pc"},
-      {"order_type": "sell", "platinum": 40, "quantity": 1, "user": {"ingame_name": "trader_d", "status": "offline", "reputation": 200}, "platform": "pc"},
-      {"order_type": "sell", "platinum": 45, "quantity": 3, "user": {"ingame_name": "trader_e", "status": "offline", "reputation": 5},   "platform": "pc"},
-      {"order_type": "sell", "platinum": 60, "quantity": 1, "user": {"ingame_name": "trader_f", "status": "offline", "reputation": 0},   "platform": "pc"},
-      {"order_type": "buy",  "platinum": 22, "quantity": 1, "user": {"ingame_name": "buyer_a",  "status": "ingame", "reputation": 80},  "platform": "pc"},
-      {"order_type": "buy",  "platinum": 25, "quantity": 1, "user": {"ingame_name": "buyer_b",  "status": "online", "reputation": 40},  "platform": "pc"},
-      {"order_type": "buy",  "platinum": 28, "quantity": 1, "user": {"ingame_name": "buyer_c",  "status": "offline","reputation": 200}, "platform": "pc"},
-      {"order_type": "buy",  "platinum": 10, "quantity": 1, "user": {"ingame_name": "buyer_d",  "status": "offline","reputation": 0},   "platform": "pc"}
-    ]
-  }
+  "apiVersion": "0.23.1",
+  "data": [
+    {"id": "s1", "type": "sell", "platinum": 35, "quantity": 1, "perTrade": 1, "visible": true, "itemId": "kpb",
+     "user": {"id": "u1", "ingameName": "trader_a", "status": "ingame",   "reputation": 120, "platform": "pc"}},
+    {"id": "s2", "type": "sell", "platinum": 36, "quantity": 2, "perTrade": 1, "visible": true, "itemId": "kpb",
+     "user": {"id": "u2", "ingameName": "trader_b", "status": "online",   "reputation": 75,  "platform": "pc"}},
+    {"id": "s3", "type": "sell", "platinum": 38, "quantity": 1, "perTrade": 1, "visible": true, "itemId": "kpb",
+     "user": {"id": "u3", "ingameName": "trader_c", "status": "online",   "reputation": 12,  "platform": "pc"}},
+    {"id": "s4", "type": "sell", "platinum": 40, "quantity": 1, "perTrade": 1, "visible": true, "itemId": "kpb",
+     "user": {"id": "u4", "ingameName": "trader_d", "status": "offline",  "reputation": 200, "platform": "pc"}},
+    {"id": "s5", "type": "sell", "platinum": 45, "quantity": 3, "perTrade": 1, "visible": true, "itemId": "kpb",
+     "user": {"id": "u5", "ingameName": "trader_e", "status": "offline",  "reputation": 5,   "platform": "pc"}},
+    {"id": "s6", "type": "sell", "platinum": 60, "quantity": 1, "perTrade": 1, "visible": true, "itemId": "kpb",
+     "user": {"id": "u6", "ingameName": "trader_f", "status": "offline",  "reputation": 0,   "platform": "pc"}},
+    {"id": "b1", "type": "buy",  "platinum": 22, "quantity": 1, "perTrade": 1, "visible": true, "itemId": "kpb",
+     "user": {"id": "u7", "ingameName": "buyer_a",  "status": "ingame",   "reputation": 80,  "platform": "pc"}},
+    {"id": "b2", "type": "buy",  "platinum": 25, "quantity": 1, "perTrade": 1, "visible": true, "itemId": "kpb",
+     "user": {"id": "u8", "ingameName": "buyer_b",  "status": "online",   "reputation": 40,  "platform": "pc"}},
+    {"id": "b3", "type": "buy",  "platinum": 28, "quantity": 1, "perTrade": 1, "visible": true, "itemId": "kpb",
+     "user": {"id": "u9", "ingameName": "buyer_c",  "status": "offline",  "reputation": 200, "platform": "pc"}},
+    {"id": "b4", "type": "buy",  "platinum": 10, "quantity": 1, "perTrade": 1, "visible": true, "itemId": "kpb",
+     "user": {"id": "u10","ingameName": "buyer_d",  "status": "offline",  "reputation": 0,   "platform": "pc"}}
+  ]
 }

@@ -1,12 +1,17 @@
 {
-  "payload": {
-    "items": [
-      {"id": "54a73e1cc4442b15c5d80f6f", "url_name": "kronen_prime_blade",   "item_name": "Kronen Prime Blade",      "thumb": "/items/images/kronen_prime_blade.thumb.png", "vaulted": true},
-      {"id": "54a73e1cc4442b15c5d80f70", "url_name": "kronen_prime_blueprint", "item_name": "Kronen Prime Blueprint", "thumb": "/items/images/kronen_prime_blueprint.thumb.png", "vaulted": true},
-      {"id": "54a73e1cc4442b15c5d80f71", "url_name": "mag_prime_blueprint",   "item_name": "Mag Prime Blueprint",     "thumb": "/items/images/mag_prime_blueprint.thumb.png", "vaulted": false},
-      {"id": "54a73e1cc4442b15c5d80f72", "url_name": "volt_prime_helmet_blueprint", "item_name": "Volt Prime Helmet Blueprint", "thumb": "/items/images/volt_prime_helmet_blueprint.thumb.png", "vaulted": false},
-      {"id": "54a73e1cc4442b15c5d80f73", "url_name": "primed_continuity",    "item_name": "Primed Continuity",       "thumb": "/items/images/primed_continuity.thumb.png", "vaulted": false},
-      {"id": "54a73e1cc4442b15c5d80f74", "url_name": "ash_prime_systems_blueprint", "item_name": "Ash Prime Systems Blueprint", "thumb": "/items/images/ash_prime_systems_blueprint.thumb.png", "vaulted": false}
-    ]
-  }
+  "apiVersion": "0.23.1",
+  "data": [
+    {"id": "54a73e1cc4442b15c5d80f6f", "slug": "kronen_prime_blade", "gameRef": "/Lotus/Types/Recipes/Weapons/WeaponParts/KronenPrimeBlade", "tags": ["component","weapon","prime"],
+     "i18n": {"en": {"name": "Kronen Prime Blade",      "thumb": "/items/images/thumbs/kronen_prime_blade.png",      "icon": "/items/images/kronen_prime_blade.png"}}},
+    {"id": "54a73e1cc4442b15c5d80f70", "slug": "kronen_prime_blueprint", "gameRef": "/Lotus/Types/Recipes/Weapons/KronenPrimeBlueprint", "tags": ["recipe","weapon","prime"],
+     "i18n": {"en": {"name": "Kronen Prime Blueprint",  "thumb": "/items/images/thumbs/kronen_prime_blueprint.png",  "icon": "/items/images/kronen_prime_blueprint.png"}}},
+    {"id": "54a73e1cc4442b15c5d80f71", "slug": "mag_prime_blueprint",   "gameRef": "/Lotus/Types/Recipes/WarframeRecipes/MagPrimeBlueprint", "tags": ["recipe","warframe","prime"],
+     "i18n": {"en": {"name": "Mag Prime Blueprint",     "thumb": "/items/images/thumbs/mag_prime_blueprint.png",     "icon": "/items/images/mag_prime_blueprint.png"}}},
+    {"id": "54a73e1cc4442b15c5d80f72", "slug": "volt_prime_helmet_blueprint", "gameRef": "/Lotus/Types/Recipes/WarframeRecipes/VoltPrimeHelmetBlueprint", "tags": ["recipe","warframe","prime"],
+     "i18n": {"en": {"name": "Volt Prime Helmet Blueprint", "thumb": "/items/images/thumbs/volt_prime_helmet_blueprint.png", "icon": "/items/images/volt_prime_helmet_blueprint.png"}}},
+    {"id": "54a73e1cc4442b15c5d80f73", "slug": "primed_continuity",    "gameRef": "/Lotus/Upgrades/Mods/Aura/PrimedContinuityMod", "tags": ["mod","primed"],
+     "i18n": {"en": {"name": "Primed Continuity",       "thumb": "/items/images/thumbs/primed_continuity.png",       "icon": "/items/images/primed_continuity.png"}}},
+    {"id": "54a73e1cc4442b15c5d80f74", "slug": "ash_prime_systems_blueprint", "gameRef": "/Lotus/Types/Recipes/WarframeRecipes/AshPrimeSystemsBlueprint", "tags": ["recipe","warframe","prime"],
+     "i18n": {"en": {"name": "Ash Prime Systems Blueprint", "thumb": "/items/images/thumbs/ash_prime_systems_blueprint.png", "icon": "/items/images/ash_prime_systems_blueprint.png"}}}
+  ]
 }

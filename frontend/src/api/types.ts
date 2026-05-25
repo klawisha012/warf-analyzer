@@ -100,7 +100,8 @@ export type WFMItemRef = {
   slug: string;
   item_name: string;
   thumb_url: string | null;
-  vaulted: boolean;
+  // v2 listing omits vaulted; only the per-item endpoint exposes it.
+  vaulted: boolean | null;
   wfm_id: string;
 };
 
