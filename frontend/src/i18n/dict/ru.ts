@@ -35,9 +35,10 @@ export const ru = {
     rep:                "реп.",
   },
   inventory: {
-    title:      "Инвентарь",
-    empty:      "Предметов нет",
-    emptyHint:  "Выберите другой слот или сбросьте фильтр.",
+    title:            "Инвентарь",
+    empty:            "Предметов нет",
+    emptyHint:        "Выберите другой слот или сбросьте фильтр.",
+    builtNotCraftable: "Собран, крафт невозможен",
     slot: {
       warframe:  "варфрейм",
       primary:   "primary",
