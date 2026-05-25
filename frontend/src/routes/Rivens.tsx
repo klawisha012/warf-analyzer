@@ -354,14 +354,21 @@ function OutliersList(props: { outliers: RivenOutlier[] }) {
       <ul class="space-y-1">
         <For each={props.outliers}>
           {(o) => (
-            <li class="flex items-center justify-between gap-2 text-sm">
-              <code class="text-xs text-slate-500 font-mono truncate">{o.auction_id}</code>
-              <span class="text-emerald-300 font-mono">
-                {t("rivens.outlierItem", {
-                  price: fmtPlat(o.price), pct: o.discount_pct,
-                  median: fmtPlat(o.historical_median), tier: o.tier,
-                })}
-              </span>
+            <li>
+              <a
+                href={auctionUrl(o.auction_id)}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex items-center justify-between gap-2 text-sm px-2 py-1 rounded hover:bg-slate-800 transition-colors"
+              >
+                <code class="text-xs text-slate-500 group-hover:text-slate-400 font-mono truncate">{o.auction_id}</code>
+                <span class="text-emerald-300 font-mono">
+                  {t("rivens.outlierItem", {
+                    price: fmtPlat(o.price), pct: o.discount_pct,
+                    median: fmtPlat(o.historical_median), tier: o.tier,
+                  })}
+                </span>
+              </a>
             </li>
           )}
         </For>
@@ -425,8 +432,10 @@ function AuctionTable(props: { rows: RivenAuctionRow[]; outliers: RivenOutlier[]
           <For each={props.rows}>
             {(r) => (
               <tr
-                class="border-b border-slate-900"
-                classList={{ "bg-emerald-950/30": outlierIds.has(r.auction_id) }}
+                class="border-b border-slate-900 hover:bg-slate-800/40 cursor-pointer transition-colors"
+                classList={{ "bg-emerald-950/30 hover:bg-emerald-900/40": outlierIds.has(r.auction_id) }}
+                onClick={() => window.open(auctionUrl(r.auction_id), "_blank", "noopener,noreferrer")}
+                title={t("rivens.openInWfm")}
               >
                 <td class="py-1 px-2 text-right font-mono text-slate-100">
                   {fmtPlat(r.buyout_price)}
@@ -496,4 +505,8 @@ function HistorySparkline(props: { rows: { ts: number; median: number | null }[]
 
 function prettyAttr(name: string): string {
   return name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function auctionUrl(auctionId: string): string {
+  return `https://warframe.market/auction/${encodeURIComponent(auctionId)}`;
 }
