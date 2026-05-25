@@ -24,6 +24,10 @@ from .naming import NameResolver
 from .wfm import dependencies as wfm_deps
 from .wfm.client import WFMClient
 from .wfm.router import router as wfm_router
+from .infra.broker import RabbitMQBus
+from .infra.push import CentrifugoPublisher
+from .wfm.consumer import handle_live_order
+from .wfm.me_router import router as me_router
 from .wfm.sets import SetComposition, SetIndex
 from .wfm.slugs import SlugResolver
 from .schemas import (
@@ -113,6 +117,22 @@ async def lifespan(app: FastAPI):
     wfm_deps.slug_resolver = slug_resolver
     wfm_deps.set_index = set_idx
 
+    # ----- Real-time subsystem -----
+    centrifugo = CentrifugoPublisher(
+        api_url=_settings.centrifugo_api,
+        api_key=_settings.centrifugo_api_key,
+        token_hmac_secret=_settings.centrifugo_token_hmac_secret,
+    )
+    bus = RabbitMQBus(url=_settings.rabbitmq_url)
+    try:
+        await bus.connect()
+    except Exception as e:
+        log.warning("RabbitMQ connect failed at startup: %s; consumer disabled", e)
+    else:
+        async def _on_live_order(msg: dict) -> None:
+            await handle_live_order(msg=msg, cache=wfm_cache, publisher=centrifugo)
+        await bus.subscribe("wfm.live.orders", _on_live_order)
+
     try:
         await bridge.refresh()
     except BridgeError as e:
@@ -123,6 +143,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     await wfm_client.aclose()
+    await bus.aclose()
     await redis_client.aclose()
 
 
@@ -139,6 +160,7 @@ app = FastAPI(
 )
 
 app.include_router(wfm_router)
+app.include_router(me_router)
 
 # ---------------------------------------------------------- helpers / deps
 
