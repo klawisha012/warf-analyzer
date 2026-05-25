@@ -79,6 +79,7 @@ class SlugResolver:
 
     def __init__(self) -> None:
         self._by_slug: dict[str, ItemRef] = {}
+        self._by_id: dict[str, ItemRef] = {}
         self._overrides: dict[str, str] = {}
         self._lock = threading.Lock()
 
@@ -88,6 +89,10 @@ class SlugResolver:
         """Replace the catalogue. Called at startup with the WFM /v2/items response."""
         with self._lock:
             self._by_slug = {it.slug: it for it in items}
+            # v2 /me/orders carries `itemId` per row, not `slug`. Build the
+            # reverse map once so the router doesn't have to walk the
+            # catalogue on every order.
+            self._by_id = {it.wfm_id: it for it in items}
 
     def apply_overrides(self, overrides: dict[str, str]) -> None:
         with self._lock:
@@ -97,6 +102,11 @@ class SlugResolver:
 
     def by_slug(self, slug: str) -> ItemRef | None:
         return self._by_slug.get(slug)
+
+    def by_wfm_id(self, wfm_id: str) -> ItemRef | None:
+        """Reverse lookup itemId -> ItemRef. Used by /me/* parsers that
+        receive v2 orders carrying `itemId` instead of `slug`."""
+        return self._by_id.get(wfm_id)
 
     def resolve_unique_name(self, unique_name: str) -> str | None:
         if unique_name in self._overrides:

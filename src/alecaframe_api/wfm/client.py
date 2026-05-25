@@ -202,21 +202,39 @@ class WFMClient:
         )
 
     async def get_profile(self, username: str, *, fresh: bool = False) -> dict[str, Any]:
-        """NOT MIGRATED to v2 yet — /v2/profile/{user} returns 404.
+        """Fetch the authenticated user's profile.
 
-        Callers should expect WFMError; routers that depend on this should
-        raise 503 with a clear message until the v2 path is published.
+        v2 dropped the public `/profile/{username}` route — `/v2/me` is the
+        replacement and requires the JWT we already send. Response shape:
+        `{apiVersion, data: {...}, error}`. The `username` argument is kept
+        for API compatibility but ignored — the endpoint always returns the
+        token's owner.
         """
-        raise WFMError(
-            "WFM /profile not migrated to v2 yet; tracked as follow-up. "
-            "Original v1 path is dead."
+        del username  # unused — v2 doesn't accept a username
+        return await self._request(
+            "GET",
+            "/me",
+            cache_key="me:profile",
+            cache_ttl=_TTL_PROFILE,
+            fresh=fresh,
         )
 
     async def get_profile_orders(self, username: str, *, fresh: bool = False) -> dict[str, Any]:
-        """NOT MIGRATED to v2 yet — see get_profile."""
-        raise WFMError(
-            "WFM /profile/{user}/orders not migrated to v2 yet; tracked as "
-            "follow-up. Original v1 path is dead."
+        """Fetch the authenticated user's listed orders (was profile/{user}/orders).
+
+        v2 endpoint: `/v2/me/orders`. Response shape:
+        `{apiVersion, data: [<order>...], error}` where each order has
+        `{id, type, platinum, quantity, perTrade, visible, itemId, ...}` —
+        same per-order shape as `/v2/orders/item/{slug}` minus the `user`
+        block (it's me).
+        """
+        del username  # unused — v2 doesn't accept a username
+        return await self._request(
+            "GET",
+            "/me/orders",
+            cache_key="me:orders",
+            cache_ttl=_TTL_ORDERS,
+            fresh=fresh,
         )
 
     async def get_statistics(self, slug: str, *, fresh: bool = False) -> dict[str, Any]:

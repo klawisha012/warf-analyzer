@@ -183,17 +183,18 @@ async def _floor_for(client, slug: str, *, online_only: bool) -> int | None:
     return stats.min_price
 
 
-@router.get("/me/listings", summary="Your active WTS/WTB on WFM")
-async def me_listings(client: WFMClientDep, br: BridgeDep) -> dict[str, Any]:
-    meta = br.meta or {}
-    inner = meta.get("meta") or {}
-    user = inner.get("wfm_username")
-    if not user:
-        raise HTTPException(503, "wfm_username not available from agent meta")
+@router.get("/me/listings", summary="Your active WTS/WTB on WFM (raw v2 payload)")
+async def me_listings(client: WFMClientDep) -> dict[str, Any]:
+    """Returns the raw `/v2/me/orders` payload (`{apiVersion, data: [...]}`).
+
+    On WFM failure returns a synthetic empty payload with 200 — callers
+    should treat absent data as "not yet available" rather than an outage.
+    """
     try:
-        return await client.get_profile_orders(user)
+        return await client.get_profile_orders("")  # arg ignored in v2
     except WFMError as e:
-        raise HTTPException(503, str(e)) from e
+        log.warning("me_listings: profile fetch failed: %s; returning empty", e)
+        return {"apiVersion": "v2", "data": [], "_stale": True}
 
 
 @router.get(
@@ -484,28 +485,58 @@ async def me_relist_nudges(
     br: BridgeDep,
     slug_resolver: SlugResolverDep,
 ) -> RelistNudgeResponse:
-    meta = (br.meta or {}).get("meta") or {}
-    user = meta.get("wfm_username")
-    if not user:
-        raise HTTPException(503, "wfm_username unknown")
-    try:
-        profile = await client.get_profile_orders(user)
-    except WFMError as e:
-        raise HTTPException(503, str(e)) from e
+    """Suggest price adjustments for your live WFM sell listings.
 
-    my_orders = (profile.get("payload") or {}).get("sell_orders") or []
-    nudges: list[RelistNudgeRow] = []
-    for mo in my_orders:
-        item_info = mo.get("item") or {}
-        slug = item_info.get("url_name") or ""
-        my_price = int(mo.get("platinum", 0))
-        if not slug or not my_price:
+    v2 changes vs v1:
+    - Profile call moved to `/v2/me/orders` (auth required, no username arg).
+    - Each order carries `itemId` (catalogue id) not `item.url_name` — we
+      reverse-resolve via SlugResolver.by_wfm_id.
+    - Response is shaped `{data: [order...]}` not `{payload: {sell_orders: [...]}}`.
+
+    On any WFM failure (decrypt-agent offline, JWT not minted yet, WFM 5xx)
+    we return an empty list with 200 instead of 503 — the UI shows the
+    "All competitive" empty state, which is far less alarming than a red
+    503 toast on a Dashboard reload.
+    """
+    try:
+        profile = await client.get_profile_orders("")  # arg ignored in v2
+    except WFMError as e:
+        log.warning("me_relist_nudges: profile fetch failed: %s; returning empty", e)
+        return RelistNudgeResponse(total=0, items=[])
+
+    raw_orders = profile.get("data") or []
+    # Only my SELL listings that are currently visible to other players.
+    my_sells: list[tuple[str, int]] = []   # (slug, my_price)
+    for mo in raw_orders:
+        if mo.get("type") != "sell" or mo.get("visible") is False:
             continue
+        item_id = mo.get("itemId") or ""
+        my_price = int(mo.get("platinum", 0) or 0)
+        if not item_id or not my_price:
+            continue
+        ref = slug_resolver.by_wfm_id(item_id)
+        if not ref:
+            continue   # catalogue not loaded or unknown id
+        my_sells.append((ref.slug, my_price))
+
+    if not my_sells:
+        return RelistNudgeResponse(total=0, items=[])
+
+    # Parallel-fetch order books for each slug to compute median + top5.
+    async def _book(slug: str) -> tuple[str, list[dict] | None]:
         try:
             payload = await client.get_orders(slug)
         except WFMError:
+            return slug, None
+        return slug, payload.get("data") or []
+
+    books = dict(await asyncio.gather(*[_book(s) for s, _ in my_sells]))
+
+    nudges: list[RelistNudgeRow] = []
+    for slug, my_price in my_sells:
+        orders = books.get(slug)
+        if orders is None:
             continue
-        orders = payload.get("data") or []
         sell = compute_stats(orders, side="sell", online_only=True)
         top5 = sell.top5 or []
         suggestion = ""

@@ -172,12 +172,32 @@ async def test_get_orders_uses_v2_path(client_factory, httpx_mock: HTTPXMock) ->
 
 
 @pytest.mark.asyncio
-async def test_get_profile_orders_raises_until_v2_migrated(client_factory) -> None:
-    """get_profile_orders raises WFMError — v2 path is unknown, follow-up tracked."""
-    from alecaframe_api.wfm.client import WFMError
+async def test_get_profile_orders_hits_v2_me_orders(client_factory, httpx_mock: HTTPXMock) -> None:
+    """v2: /me/orders replaces v1 /profile/{user}/orders; username arg ignored."""
+    httpx_mock.add_response(
+        url="https://mock.wfm.test/v2/me/orders", method="GET",
+        json={"apiVersion": "0.23.1", "data": [
+            {"id": "o1", "type": "sell", "platinum": 50, "itemId": "iid1", "visible": True},
+        ]},
+    )
     c = client_factory()
-    with pytest.raises(WFMError, match="not migrated to v2"):
-        await c.get_profile_orders("klawisha012")
+    payload = await c.get_profile_orders("ignored-username")
+    assert payload["data"][0]["itemId"] == "iid1"
+    # Confirm the request actually went to /v2/me/orders, not the v1 path.
+    req = httpx_mock.get_request()
+    assert str(req.url).endswith("/v2/me/orders")
+
+
+@pytest.mark.asyncio
+async def test_get_profile_hits_v2_me(client_factory, httpx_mock: HTTPXMock) -> None:
+    """v2: /me replaces v1 /profile/{user}; username arg ignored."""
+    httpx_mock.add_response(
+        url="https://mock.wfm.test/v2/me", method="GET",
+        json={"apiVersion": "0.23.1", "data": {"ingameName": "me", "reputation": 100}},
+    )
+    c = client_factory()
+    payload = await c.get_profile("ignored-username")
+    assert payload["data"]["ingameName"] == "me"
 
 
 @pytest.mark.asyncio
