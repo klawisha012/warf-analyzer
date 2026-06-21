@@ -29,6 +29,7 @@ export const en = {
     totalQty: "Total quantity",
     notFound: "Nothing found",
     notFoundHint: "Adjust the filter or minimum quantity.",
+    hideZero: "Hide zero-value",
   },
   dashboard: {
     healthTitle:        "Health",
@@ -54,6 +55,7 @@ export const en = {
     emptyHint:     "Try a different slot or clear the filter.",
     usedIn:        "Used in:",
     finalProduct:  "Final product",
+    craftOnly:     "Used in crafting",
     slot: {
       warframe:  "warframe",
       primary:   "primary",

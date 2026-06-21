@@ -4,10 +4,12 @@ import PageHeader from "../components/PageHeader";
 import StatTile from "../components/StatTile";
 import EmptyState from "../components/EmptyState";
 import ValuationCard from "../components/ValuationCard";
+import PagerControl from "../components/Pager";
 import { fetchers, keys } from "../api/queries";
 import { fmtPlat } from "../lib/format";
 import { priceFor } from "../lib/priceStore";
-import { useItemThumbs } from "../lib/itemImages";
+import { useItemThumbs, warframestatImg } from "../lib/itemImages";
+import { createPager } from "../lib/pagination";
 import { useSlugChannel } from "../hooks/useSlugChannel";
 import { t } from "../i18n";
 
@@ -24,6 +26,7 @@ const SORT_FIELDS = [
 export default function Arcanes() {
   const [minCount, setMinCount] = createSignal(1);
   const [q, setQ] = createSignal("");
+  const [hideZero, setHideZero] = createSignal(false);
   const [sortBy, setSortBy] = createSignal<string>("est_value");
   const [sortDir, setSortDir] = createSignal<"asc" | "desc">("desc");
   const thumbOf = useItemThumbs();
@@ -35,8 +38,10 @@ export default function Arcanes() {
 
   const filtered = createMemo(() => {
     const needle = q().toLowerCase().trim();
-    const all = arcanes.data?.items ?? [];
-    return needle ? all.filter((x) => x.name.toLowerCase().includes(needle)) : all;
+    let all = arcanes.data?.items ?? [];
+    if (needle) all = all.filter((x) => x.name.toLowerCase().includes(needle));
+    if (hideZero()) all = all.filter((x) => (x.estimated_value ?? 0) > 0);
+    return all;
   });
 
   const sorted = createMemo(() => {
@@ -61,6 +66,8 @@ export default function Arcanes() {
   const totalValue = createMemo(() => filtered().reduce((s, it) => s + (it.estimated_value ?? 0), 0));
   const totalQty = createMemo(() => filtered().reduce((s, it) => s + (it.count ?? 0), 0));
 
+  const pager = createPager(sorted, 24);
+
   useSlugChannel(() => sorted().map((it) => it.slug).filter(Boolean) as string[]);
 
   return (
@@ -69,16 +76,15 @@ export default function Arcanes() {
         title={t("arcanes.title")}
         actions={
           <div class="flex flex-wrap items-center gap-3">
+            <label class="flex items-center gap-2 text-xs font-medium text-sub cursor-pointer select-none">
+              <input type="checkbox" checked={hideZero()} onChange={(e) => setHideZero(e.currentTarget.checked)} class="accent-[var(--indigo)] w-4 h-4" />
+              {t("common.hideZero")}
+            </label>
             <div class="flex items-center gap-1.5">
               <select value={sortBy()} onChange={(e) => setSortBy(e.currentTarget.value)} class="field w-auto pr-2">
                 <For each={SORT_FIELDS}>{(f) => <option value={f.field}>{f.label}</option>}</For>
               </select>
-              <button
-                type="button"
-                class="btn-ghost px-3"
-                title={sortDir() === "asc" ? "Ascending" : "Descending"}
-                onClick={() => setSortDir(sortDir() === "asc" ? "desc" : "asc")}
-              >
+              <button type="button" class="btn-ghost px-3" title={sortDir() === "asc" ? "Ascending" : "Descending"} onClick={() => setSortDir(sortDir() === "asc" ? "desc" : "asc")}>
                 {sortDir() === "asc" ? "↑" : "↓"}
               </button>
             </div>
@@ -86,7 +92,7 @@ export default function Arcanes() {
               {t("primeParts.minQty")}
               <input type="number" min={1} value={minCount()} onInput={(e) => setMinCount(Math.max(1, +e.currentTarget.value || 1))} class="field w-16 text-center num" />
             </label>
-            <input type="search" class="field sm:w-48" placeholder={t("common.filter")} value={q()} onInput={(e) => setQ(e.currentTarget.value)} />
+            <input type="search" class="field sm:w-40" placeholder={t("common.filter")} value={q()} onInput={(e) => setQ(e.currentTarget.value)} />
           </div>
         }
       />
@@ -107,8 +113,8 @@ export default function Arcanes() {
         }
       >
         <Show when={sorted().length > 0} fallback={<EmptyState title={t("common.notFound")} hint={t("common.notFoundHint")} />}>
-          <div class="grid grid-cols-1 xl:grid-cols-2 gap-3">
-            <For each={sorted()}>
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start">
+            <For each={pager.pageItems()}>
               {(it) => {
                 const live = () => priceFor(it.slug);
                 const sell = () => live()?.sell_min ?? it.sell_min;
@@ -118,6 +124,7 @@ export default function Arcanes() {
                     name={it.name}
                     slug={it.slug}
                     thumb={thumbOf(it.slug)}
+                    thumbFallback={warframestatImg(it.image_name)}
                     rank={it.max_rank}
                     stats={[
                       { label: "Sell 0", value: fmtPlat(sell()), tone: "fg" },
@@ -131,6 +138,7 @@ export default function Arcanes() {
               }}
             </For>
           </div>
+          <PagerControl page={pager.page()} totalPages={pager.totalPages()} total={pager.total()} onPage={pager.setPage} />
         </Show>
       </Show>
     </div>

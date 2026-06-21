@@ -15,6 +15,7 @@ type ValuationCardProps = {
   name: string;
   slug: string | null;
   thumb?: string | null;
+  thumbFallback?: string | null;
   /** Mod / arcane max rank → small "R{n}" badge. */
   rank?: number | null;
   stats: Stat[];
@@ -29,7 +30,7 @@ type ValuationCardProps = {
 export default function ValuationCard(props: ValuationCardProps) {
   return (
     <article class="surface p-4 flex items-center gap-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-line-strong">
-      <ItemThumb src={props.thumb} name={props.name} size={52} />
+      <ItemThumb src={props.thumb} fallback={props.thumbFallback} name={props.name} size={52} />
 
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">

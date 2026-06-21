@@ -4,16 +4,19 @@ import PageHeader from "../components/PageHeader";
 import StatTile from "../components/StatTile";
 import EmptyState from "../components/EmptyState";
 import ValuationCard from "../components/ValuationCard";
+import PagerControl from "../components/Pager";
 import { fetchers, keys } from "../api/queries";
 import { fmtPlat, fmtInt } from "../lib/format";
 import { priceFor } from "../lib/priceStore";
-import { useItemThumbs } from "../lib/itemImages";
+import { useItemThumbs, warframestatImg } from "../lib/itemImages";
+import { createPager } from "../lib/pagination";
 import { useSlugChannel } from "../hooks/useSlugChannel";
 import { t } from "../i18n";
 
 export default function PrimeParts() {
   const [minCount, setMinCount] = createSignal(1);
   const [q, setQ] = createSignal("");
+  const [hideZero, setHideZero] = createSignal(false);
   const thumbOf = useItemThumbs();
 
   const parts = createQuery(() => ({
@@ -23,12 +26,16 @@ export default function PrimeParts() {
 
   const filtered = createMemo(() => {
     const needle = q().toLowerCase().trim();
-    const all = parts.data?.items ?? [];
-    return needle ? all.filter((x) => x.name.toLowerCase().includes(needle)) : all;
+    let all = parts.data?.items ?? [];
+    if (needle) all = all.filter((x) => x.name.toLowerCase().includes(needle));
+    if (hideZero()) all = all.filter((x) => (x.estimated_value ?? 0) > 0);
+    return all;
   });
 
   const totalValue = createMemo(() => filtered().reduce((s, it) => s + (it.estimated_value ?? 0), 0));
   const totalQty = createMemo(() => filtered().reduce((s, it) => s + (it.count ?? 0), 0));
+
+  const pager = createPager(filtered, 24);
 
   useSlugChannel(() => filtered().map((it) => it.slug).filter(Boolean) as string[]);
 
@@ -38,11 +45,15 @@ export default function PrimeParts() {
         title={t("primeParts.title")}
         actions={
           <div class="flex flex-wrap items-center gap-3">
+            <label class="flex items-center gap-2 text-xs font-medium text-sub cursor-pointer select-none">
+              <input type="checkbox" checked={hideZero()} onChange={(e) => setHideZero(e.currentTarget.checked)} class="accent-[var(--indigo)] w-4 h-4" />
+              {t("common.hideZero")}
+            </label>
             <label class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-sub">
               {t("primeParts.minQty")}
               <input type="number" min={1} value={minCount()} onInput={(e) => setMinCount(Math.max(1, +e.currentTarget.value || 1))} class="field w-16 text-center num" />
             </label>
-            <input type="search" class="field sm:w-56" placeholder={t("common.filter")} value={q()} onInput={(e) => setQ(e.currentTarget.value)} />
+            <input type="search" class="field sm:w-48" placeholder={t("common.filter")} value={q()} onInput={(e) => setQ(e.currentTarget.value)} />
           </div>
         }
       />
@@ -63,8 +74,8 @@ export default function PrimeParts() {
         }
       >
         <Show when={filtered().length > 0} fallback={<EmptyState title={t("primeParts.empty")} hint={t("primeParts.emptyHint")} />}>
-          <div class="grid grid-cols-1 xl:grid-cols-2 gap-3">
-            <For each={filtered()}>
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start">
+            <For each={pager.pageItems()}>
               {(it) => {
                 const live = () => priceFor(it.slug);
                 const sell = () => live()?.sell_min ?? it.sell_min;
@@ -78,6 +89,7 @@ export default function PrimeParts() {
                     name={it.name}
                     slug={it.slug}
                     thumb={thumbOf(it.slug)}
+                    thumbFallback={warframestatImg(it.image_name)}
                     stats={[
                       { label: t("primeParts.col.qty"), value: fmtInt(it.count), tone: "fg" },
                       { label: t("primeParts.col.sell"), value: fmtPlat(sell()), tone: "fg" },
@@ -89,6 +101,7 @@ export default function PrimeParts() {
               }}
             </For>
           </div>
+          <PagerControl page={pager.page()} totalPages={pager.totalPages()} total={pager.total()} onPage={pager.setPage} />
         </Show>
       </Show>
     </div>

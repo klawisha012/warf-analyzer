@@ -149,6 +149,9 @@ class PricedItemEntry(BaseModel):
     unique_name: str
     name: str
     slug: str | None
+    # DE imageName (from cachedData) → warframestat CDN. Lets the UI show art
+    # for items WFM has no thumbnail for (e.g. whole warframes, slug=None).
+    image_name: str | None = None
     count: int | None = None
     vaulted: bool | None = None
     sell_min: int | None = None

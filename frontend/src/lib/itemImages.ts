@@ -16,6 +16,16 @@ export function wfmAsset(path: string | null | undefined): string | null {
   return `${WFM_ASSET_BASE}/${path.replace(/^\/+/, "")}`;
 }
 
+// Fallback art via the warframestat CDN, keyed by the DE imageName the backend
+// now ships on each item. Covers items WFM has no thumbnail for (whole
+// warframes etc.). 404s degrade to the monogram tile in <ItemThumb>.
+const WARFRAMESTAT_IMG_BASE = "https://cdn.warframestat.us/img";
+export function warframestatImg(imageName: string | null | undefined): string | null {
+  if (!imageName) return null;
+  if (/^https?:\/\//.test(imageName)) return imageName;
+  return `${WARFRAMESTAT_IMG_BASE}/${imageName.replace(/^\/+/, "")}`;
+}
+
 /**
  * Reactive slug → thumbnail-URL accessor. The underlying /wfm/items query is
  * deduped by TanStack Query, so calling this hook from many components costs

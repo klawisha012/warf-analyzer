@@ -366,6 +366,7 @@ async def me_inventory_priced(
         sell_min = stats.sell_min if stats else None
         enriched.append(PricedItemEntry(
             unique_name=u, name=name, slug=slug,
+            image_name=(rs.lookup(u) or {}).get("image"),
             count=it.get("ItemCount"), vaulted=vaulted,
             sell_min=sell_min,
             sell_median=sell_median,
@@ -418,6 +419,7 @@ async def me_prime_parts_priced(
         sell_min = stats.sell_min if stats else None
         rows.append(PricedItemEntry(
             unique_name=u, name=name, slug=slug, count=count, vaulted=vaulted,
+            image_name=(rs.lookup(u) or {}).get("image"),
             sell_min=sell_min,
             sell_median=stats.sell_median if stats else None,
             sell_spread=stats.sell_spread if stats else None,
@@ -728,6 +730,7 @@ async def me_mods_priced(
 
         rows.append(PricedItemEntry(
             unique_name=u, name=name, slug=slug, count=count, vaulted=vaulted,
+            image_name=(rs.lookup(u) or {}).get("image"),
             sell_min=sell_min,
             sell_median=sell_median,
             sell_spread=sell_spread,
@@ -819,6 +822,7 @@ async def me_arcanes_priced(
 
         rows.append(PricedItemEntry(
             unique_name=u, name=name, slug=slug, count=count, vaulted=vaulted,
+            image_name=(rs.lookup(u) or {}).get("image"),
             sell_min=sell_min,
             sell_median=sell_median,
             sell_spread=sell_spread,

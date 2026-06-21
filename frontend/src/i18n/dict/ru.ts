@@ -30,6 +30,7 @@ export const ru = {
     totalQty: "Всего штук",
     notFound: "Ничего не найдено",
     notFoundHint: "Измените фильтр или минимальное количество.",
+    hideZero: "Скрыть без цены",
   },
   dashboard: {
     healthTitle:        "Состояние",
@@ -55,6 +56,7 @@ export const ru = {
     emptyHint:     "Выберите другой слот или сбросьте фильтр.",
     usedIn:        "Используется в:",
     finalProduct:  "Финальный продукт",
+    craftOnly:     "Используется в крафте",
     slot: {
       warframe:  "варфрейм",
       primary:   "primary",

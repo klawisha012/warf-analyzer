@@ -62,6 +62,7 @@ export type PricedItem = {
   unique_name: string;
   name: string;
   slug: string | null;
+  image_name?: string | null;
   count: number | null;
   vaulted: boolean | null;
   sell_min: number | null;
