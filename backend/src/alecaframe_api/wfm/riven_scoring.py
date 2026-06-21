@@ -217,3 +217,29 @@ def resolve_weapon(
     key = normalize_name(item_name)
     key = overrides.get(key, key)
     return index.get(key)
+
+
+# ---- market signal (S4) ----------------------------------------------------
+# Crosses the weapon-aware quality grade with the live market price to flag
+# where quality and price disagree. `median` is the overall market median for
+# the weapon (compute_tier_stats over all auctions).
+_STEAL_GRADES = {"S", "A"}
+
+
+def classify_market_signal(
+    grade: str | None, buyout_price: int | None, median: int | None,
+) -> str | None:
+    """Cross the quality grade with the market price.
+
+    - "steal": a strong roll (S/A) priced BELOW the market median — good and
+      undervalued, the actionable buy.
+    - "trap": junk (F) priced ABOVE the market median — overpriced, warn.
+    Returns None when inputs are missing or the price is fair.
+    """
+    if grade is None or buyout_price is None or not median or median <= 0:
+        return None
+    if grade in _STEAL_GRADES and buyout_price < median:
+        return "steal"
+    if grade == "F" and buyout_price > median:
+        return "trap"
+    return None

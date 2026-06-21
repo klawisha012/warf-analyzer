@@ -5,6 +5,7 @@ from alecaframe_api.wfm.riven_scoring import (
     Profile,
     _grade,
     build_profiles,
+    classify_market_signal,
     critness,
     is_scoreable_category,
     resolve_weapon,
@@ -218,3 +219,24 @@ def test_faction_and_element_and_base_damage_have_weight() -> None:
 
 def test_build_profiles_empty_stats_returns_empty() -> None:
     assert build_profiles({"name": "X", "category": "primary", "stats": {}}) == []
+
+
+def test_market_signal_steal_when_good_grade_priced_below_median() -> None:
+    # A strong roll (S/A) priced under the market median is the actionable buy.
+    assert classify_market_signal("S", buyout_price=80, median=120) == "steal"
+    assert classify_market_signal("A", buyout_price=119, median=120) == "steal"
+
+
+def test_market_signal_trap_when_bad_grade_priced_above_median() -> None:
+    # Junk (F) priced above the market median is overpriced — warn the buyer.
+    assert classify_market_signal("F", buyout_price=200, median=120) == "trap"
+
+
+def test_market_signal_none_for_fair_or_missing_inputs() -> None:
+    assert classify_market_signal("S", buyout_price=120, median=120) is None  # fair (not below)
+    assert classify_market_signal("B", buyout_price=10, median=120) is None    # mid grade
+    assert classify_market_signal("F", buyout_price=10, median=120) is None    # junk but cheap = fine
+    assert classify_market_signal(None, buyout_price=10, median=120) is None   # unscored
+    assert classify_market_signal("S", buyout_price=None, median=120) is None  # no price
+    assert classify_market_signal("S", buyout_price=10, median=None) is None   # no median
+    assert classify_market_signal("S", buyout_price=10, median=0) is None      # zero median guard

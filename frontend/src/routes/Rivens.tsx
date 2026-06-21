@@ -597,6 +597,18 @@ function AuctionTable(props: { rows: RivenAuctionRow[]; outliers: RivenOutlier[]
                       {r.grade}
                     </span>
                     <span class="text-[10px] text-dim num"> · {r.score}</span>
+                    <Show when={r.market_signal}>
+                      <span
+                        class="ml-1 text-[10px] px-1 rounded font-semibold"
+                        classList={{
+                          "bg-mint/20 text-mint": r.market_signal === "steal",
+                          "bg-rose-500/15 text-rose-300": r.market_signal === "trap",
+                        }}
+                        title={t(r.market_signal === "steal" ? "rivens.stealHint" : "rivens.trapHint")}
+                      >
+                        {r.market_signal === "steal" ? `🔥 ${t("rivens.steal")}` : `⚠ ${t("rivens.trap")}`}
+                      </span>
+                    </Show>
                   </Show>
                 </td>
                 <td class="py-1.5 px-2 text-right num text-fg">{fmtPlat(r.buyout_price)}</td>

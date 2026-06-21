@@ -180,6 +180,8 @@ export type RivenAuctionRow = {
   score: number | null;
   unscored: boolean;
   unscored_reason: string | null;
+  // Quality x price: "steal" (S/A under median), "trap" (F over median), null. (S4)
+  market_signal: string | null;
 };
 
 export type RivenTierStats = {
