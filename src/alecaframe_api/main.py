@@ -28,6 +28,11 @@ from .wfm.auctions_client import WFMAuctionClient
 from .wfm.auction_poller import AuctionPoller
 from .wfm.router import router as wfm_router
 from .wfm.rivens_router import router as rivens_router
+from .fissures.client import FissureClient
+from .fissures.poller import FissurePoller
+from .fissures.telegram import TelegramClient, TelegramBot
+from .fissures import dependencies as fissures_deps
+from .fissures.router import router as fissures_router
 from .infra.broker import RabbitMQBus
 from .infra.push import CentrifugoPublisher
 from .wfm.consumer import handle_live_order
@@ -88,6 +93,8 @@ repo: Repo | None = None
 recipe_uses_idx: dict[str, list[RecipeUse]] = {}
 auctions_client: WFMAuctionClient | None = None
 auction_poller: AuctionPoller | None = None
+telegram_client: TelegramClient | None = None
+fissure_poller: FissurePoller | None = None
 
 
 @asynccontextmanager
@@ -206,6 +213,27 @@ async def lifespan(app: FastAPI):
         repo=repo, client=auctions_client, publisher=centrifugo,
     )
     auction_poller_task = asyncio.create_task(auction_poller.run())
+
+    # ----- Void Fissure subsystem -----
+    global telegram_client, fissure_poller
+    fissures_deps.fissure_client = FissureClient(
+        base_url=_settings.fissure_source_base_url,
+        platform=_settings.wfm_platform,
+    )
+    if _settings.tg_api_key:
+        telegram_client = TelegramClient(token=_settings.tg_api_key)
+    fissure_poller = FissurePoller(
+        repo=repo, client=fissures_deps.fissure_client,
+        telegram=telegram_client,
+        poll_interval=float(_settings.fissure_poll_interval_seconds),
+    )
+    fissure_poller_task = asyncio.create_task(fissure_poller.run())
+    telegram_bot_task: asyncio.Task | None = None
+    if telegram_client is not None:
+        telegram_bot = TelegramBot(client=telegram_client, repo=repo)
+        telegram_bot_task = asyncio.create_task(telegram_bot.run())
+    else:
+        log.info("TG_API_KEY not set; telegram subsystem disabled")
     bus = RabbitMQBus(url=_settings.rabbitmq_url)
     _consumer_subscribed = {"v": False}
 
@@ -249,7 +277,12 @@ async def lifespan(app: FastAPI):
     # Shutdown
     price_poller_task.cancel()
     auction_poller_task.cancel()
-    for task in (price_poller_task, auction_poller_task):
+    fissure_poller_task.cancel()
+    if telegram_bot_task is not None:
+        telegram_bot_task.cancel()
+    for task in (price_poller_task, auction_poller_task, fissure_poller_task, telegram_bot_task):
+        if task is None:
+            continue
         try:
             await task
         except (asyncio.CancelledError, Exception):
@@ -279,6 +312,7 @@ app.include_router(wfm_router)
 app.include_router(me_router)
 app.include_router(history_router)
 app.include_router(rivens_router)
+app.include_router(fissures_router)
 
 # ---------------------------------------------------------- helpers / deps
 
