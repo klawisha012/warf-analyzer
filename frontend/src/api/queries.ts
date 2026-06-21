@@ -1,6 +1,11 @@
 import { api } from "./client";
 import type {
   ApiInfo, HealthResponse,
+  FissuresResponse,
+  FissureMetaResponse,
+  FissureSubscriptionsResponse,
+  FissureSubscriptionCreate,
+  TelegramChatsResponse,
   OrderBookResponse,
   PricedItemListResponse,
   PricesSnapshotResponse,
@@ -32,6 +37,10 @@ export const keys = {
   rivenWatchlist: () => ["rivens", "watchlist"] as const,
   rivenHistory:   (slug: string, tier: string, days: number) => ["rivens", "history", slug, tier, days] as const,
   rivenWeapons:   () => ["rivens", "weapons"] as const,
+  fissuresLive:  () => ["fissures", "live"] as const,
+  fissuresMeta:  () => ["fissures", "meta"] as const,
+  fissuresSubs:  () => ["fissures", "subs"] as const,
+  fissuresChats: () => ["fissures", "chats"] as const,
 };
 
 export const fetchers = {
@@ -69,4 +78,17 @@ export const fetchers = {
   rivenHistory: (slug: string, tier = "all", days = 7) =>
     api<RivenHistoryResponse>(`/rivens/history/${encodeURIComponent(slug)}?tier=${tier}&days=${days}`),
   rivenWeapons: () => api<RivenWeaponsResponse>("/rivens/weapons"),
+  fissuresLive: () => api<FissuresResponse>("/fissures"),
+  fissuresMeta: () => api<FissureMetaResponse>("/fissures/meta"),
+  fissuresSubsList: () => api<FissureSubscriptionsResponse>("/fissures/subscriptions"),
+  fissuresSubAdd: (body: FissureSubscriptionCreate) =>
+    api<FissureSubscriptionsResponse>("/fissures/subscriptions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  fissuresSubRemove: (id: number) =>
+    api<{ removed: number }>(`/fissures/subscriptions/${id}`, { method: "DELETE" }),
+  fissuresChats: () => api<TelegramChatsResponse>("/fissures/telegram/chats"),
+  fissuresTest: () => api<{ sent: number; chats: number }>("/fissures/telegram/test", { method: "POST" }),
 };
