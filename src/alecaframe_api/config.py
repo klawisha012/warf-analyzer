@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     # /me/* fan-out endpoints finish under nginx's 120s proxy_read_timeout.
     wfm_rate_limit_per_second: int = 5
 
+    # void fissures + telegram
+    tg_api_key: str | None = Field(default=None, validation_alias="TG_API_KEY")
+    fissure_poll_interval_seconds: int = 60
+    fissure_source_base_url: str = "https://api.warframestat.us"
+
     # uvicorn-only (used by the `run()` entry point in main.py).
     # Default 127.0.0.1 is safe for local dev; the backend Dockerfile sets
     # ALECA_HOST=0.0.0.0 so the container exposes properly.
