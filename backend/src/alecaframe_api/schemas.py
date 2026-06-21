@@ -287,6 +287,13 @@ class RivenAuctionRow(BaseModel):
     owner_status: str | None = None         # 'ingame' | 'online' | 'offline'
     tier: str
     attributes: list[RivenAuctionAttribute] = []
+    # Weapon-aware quality score (base profile in M1). `grade`/`score` are null
+    # when `unscored` is set (no base profile, melee, etc. — reason in
+    # `unscored_reason`). Per-profile/Incarnon scores arrive in S3.
+    grade: str | None = None
+    score: int | None = None
+    unscored: bool = False
+    unscored_reason: str | None = None
 
 
 class RivenTierStats(BaseModel):

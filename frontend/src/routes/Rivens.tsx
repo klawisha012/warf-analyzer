@@ -562,6 +562,7 @@ function AuctionTable(props: { rows: RivenAuctionRow[]; outliers: RivenOutlier[]
       <table class="w-full text-xs">
         <thead>
           <tr class="border-b border-line text-left text-sub">
+            <th class="py-1.5 px-2">{t("rivens.colGrade")}</th>
             <th class="py-1.5 px-2 text-right">{t("rivens.colPrice")}</th>
             <th class="py-1.5 px-2 text-right">{t("rivens.colTopBid")}</th>
             <th class="py-1.5 px-2 text-right">{t("rivens.colReRolls")}</th>
@@ -579,6 +580,25 @@ function AuctionTable(props: { rows: RivenAuctionRow[]; outliers: RivenOutlier[]
                 onClick={() => window.open(auctionUrl(r.auction_id), "_blank", "noopener,noreferrer")}
                 title={t("rivens.openInWfm")}
               >
+                <td class="py-1.5 px-2 whitespace-nowrap">
+                  <Show
+                    when={!r.unscored && r.grade}
+                    fallback={<span class="text-dim" title={r.unscored_reason ?? ""}>—</span>}
+                  >
+                    <span
+                      class="font-bold"
+                      classList={{
+                        "text-mint": r.grade === "S" || r.grade === "A",
+                        "text-cyan": r.grade === "B",
+                        "text-amber": r.grade === "C",
+                        "text-rose-300": r.grade === "F",
+                      }}
+                    >
+                      {r.grade}
+                    </span>
+                    <span class="text-[10px] text-dim num"> · {r.score}</span>
+                  </Show>
+                </td>
                 <td class="py-1.5 px-2 text-right num text-fg">{fmtPlat(r.buyout_price)}</td>
                 <td class="py-1.5 px-2 text-right num text-sub">{fmtPlat(r.top_bid)}</td>
                 <td class="py-1.5 px-2 text-right num text-sub">{r.re_rolls ?? "—"}</td>
