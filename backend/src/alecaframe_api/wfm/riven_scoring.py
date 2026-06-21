@@ -224,6 +224,14 @@ def resolve_weapon(
 # where quality and price disagree. `median` is the overall market median for
 # the weapon (compute_tier_stats over all auctions).
 _STEAL_GRADES = {"S", "A"}
+# Require a meaningful margin off the median, not a 1-platinum difference (which
+# is noise on cheap-median weapons). 0.8 mirrors `detect_outliers`'s existing
+# "meaningfully cheap" threshold; 1.25 is its inverse for the overpriced side.
+# NOTE: ratios + the use of the OVERALL median (vs a peer/tier median) and
+# outlier-trimming of the reference price are calibration choices to revisit in
+# S2's calibration gate against real god-roll data (see #3).
+_STEAL_RATIO = 0.8
+_TRAP_RATIO = 1.25
 
 
 def classify_market_signal(
@@ -231,15 +239,15 @@ def classify_market_signal(
 ) -> str | None:
     """Cross the quality grade with the market price.
 
-    - "steal": a strong roll (S/A) priced BELOW the market median — good and
-      undervalued, the actionable buy.
-    - "trap": junk (F) priced ABOVE the market median — overpriced, warn.
-    Returns None when inputs are missing or the price is fair.
+    - "steal": a strong roll (S/A) priced at/below 0.8x the market median —
+      good and undervalued, the actionable buy.
+    - "trap": junk (F) priced at/above 1.25x the market median — overpriced.
+    Returns None when inputs are missing or the price is within the fair band.
     """
-    if grade is None or buyout_price is None or not median or median <= 0:
+    if grade is None or buyout_price is None or buyout_price <= 0 or not median or median <= 0:
         return None
-    if grade in _STEAL_GRADES and buyout_price < median:
+    if grade in _STEAL_GRADES and buyout_price <= _STEAL_RATIO * median:
         return "steal"
-    if grade == "F" and buyout_price > median:
+    if grade == "F" and buyout_price >= _TRAP_RATIO * median:
         return "trap"
     return None

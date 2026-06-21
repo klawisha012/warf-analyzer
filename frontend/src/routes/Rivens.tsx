@@ -597,7 +597,7 @@ function AuctionTable(props: { rows: RivenAuctionRow[]; outliers: RivenOutlier[]
                       {r.grade}
                     </span>
                     <span class="text-[10px] text-dim num"> · {r.score}</span>
-                    <Show when={r.market_signal}>
+                    <Show when={r.market_signal === "steal" || r.market_signal === "trap"}>
                       <span
                         class="ml-1 text-[10px] px-1 rounded font-semibold"
                         classList={{
