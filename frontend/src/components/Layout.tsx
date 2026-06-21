@@ -12,6 +12,7 @@ const NAV = [
   { href: "/prime-parts", key: "nav.primeParts" },
   { href: "/sets",        key: "nav.sets"       },
   { href: "/rivens",      key: "nav.rivens"     },
+  { href: "/fissures",    key: "nav.fissures"   },
 ] as const;
 
 export default function Layout(props: LayoutProps) {

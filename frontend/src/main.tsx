@@ -15,6 +15,7 @@ const Inventory  = lazy(() => import("./routes/Inventory"));
 const PrimeParts = lazy(() => import("./routes/PrimeParts"));
 const Sets       = lazy(() => import("./routes/Sets"));
 const Rivens     = lazy(() => import("./routes/Rivens"));
+const Fissures   = lazy(() => import("./routes/Fissures"));
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -57,6 +58,7 @@ render(
         <Route path="/prime-parts" component={PrimeParts} />
         <Route path="/sets"        component={Sets} />
         <Route path="/rivens"      component={Rivens} />
+        <Route path="/fissures"    component={Fissures} />
       </Router>
     </QueryClientProvider>
   ),
