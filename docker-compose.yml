@@ -15,6 +15,7 @@ x-backend-env: &backend-env
   ALECA_TTL_SECONDS: ${ALECA_TTL_SECONDS:-60}
   ALECA_WFM_PLATFORM: ${ALECA_WFM_PLATFORM:-pc}
   ALECA_LOG_LEVEL: ${ALECA_LOG_LEVEL:-INFO}
+  TG_API_KEY: ${TG_API_KEY:-}
 
 services:
   redis:
