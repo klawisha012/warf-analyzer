@@ -1,0 +1,38 @@
+[
+  {
+    "id": "6a37c4e71242731bf68ce5b2",
+    "activation": "2026-06-21T11:03:03.054Z",
+    "expiry": "2026-06-21T12:55:09.638Z",
+    "node": "Tuvul Commons (Zariman)",
+    "missionType": "Void Cascade",
+    "enemy": "Crossfire",
+    "tier": "Omnia",
+    "tierNum": 6,
+    "isStorm": false,
+    "isHard": false
+  },
+  {
+    "id": "6a37c2cad201d87c508ce5b1",
+    "activation": "2026-06-21T10:54:02.850Z",
+    "expiry": "2026-06-21T12:42:01.145Z",
+    "node": "Proteus (Neptune)",
+    "missionType": "Defense",
+    "enemy": "Corpus",
+    "tier": "Neo",
+    "tierNum": 3,
+    "isStorm": false,
+    "isHard": true
+  },
+  {
+    "id": "6a37bf830c9a9f02258ce5b1",
+    "activation": "2026-06-21T11:20:03.351Z",
+    "expiry": "2026-06-21T12:50:03.351Z",
+    "node": "Bendar Cluster (Earth)",
+    "missionType": "Skirmish",
+    "enemy": "Grineer",
+    "tier": "Lith",
+    "tierNum": 1,
+    "isStorm": true,
+    "isHard": false
+  }
+]
