@@ -69,6 +69,9 @@ export type PricedItem = {
   sell_spread: number | null;
   buy_max: number | null;
   estimated_value: number | null;
+  sell_min_max_rank?: number | null;
+  buy_max_max_rank?: number | null;
+  max_rank?: number | null;
   stale: boolean;
   used_in: ItemUse[];
 };
@@ -199,6 +202,8 @@ export type RivenAuctionsResponse = {
   outliers: RivenOutlier[];
   top_attributes: RivenTopAttribute[];
   strategies: RivenStrategyTip[];
+  avoid_negatives: string[];
+  harmless_negatives: string[];
 };
 
 export type RivenWatchEntry = {

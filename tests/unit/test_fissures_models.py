@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from tests import FIXTURES_DIR
 from alecaframe_api.fissures.models import parse_fissure, _planet_from_node
 
 
 def _load() -> list[dict]:
-    p = Path(__file__).parent / "fixtures" / "wfm_fissures_sample.json"
+    p = FIXTURES_DIR / "wfm_fissures_sample.json"
     return json.loads(p.read_text(encoding="utf-8"))
 
 

@@ -106,6 +106,8 @@ class NameResolver:
             "trading_tax": it.get("tradingTax"),
             "tradable": it.get("tradable"),
             "mastery_req": it.get("masteryReq"),
+            "fusion_limit": it.get("fusionLimit"),
+            "level_stats": it.get("levelStats"),
         }
 
     # --------------------------------------------------------- lookups
@@ -125,6 +127,16 @@ class NameResolver:
             return None
         self._ensure_loaded()
         return self._table.get(unique_name)
+
+    def lookup_by_name(self, name: str | None) -> dict[str, Any] | None:
+        if not name:
+            return None
+        self._ensure_loaded()
+        name_lower = name.lower()
+        for v in self._table.values():
+            if v.get("name", "").lower() == name_lower:
+                return v
+        return None
 
     def enrich(self, items: list[dict[str, Any]], *, key: str = "ItemType") -> list[dict[str, Any]]:
         """Return new list with `name`, `category`, `ducats` added per item."""

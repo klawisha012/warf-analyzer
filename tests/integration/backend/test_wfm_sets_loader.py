@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from tests import FIXTURES_DIR
 from alecaframe_api.wfm.sets_loader import load_set_compositions_from_aleca
 from alecaframe_api.wfm.slugs import ItemRef, SlugResolver
 
@@ -14,17 +15,17 @@ from alecaframe_api.wfm.slugs import ItemRef, SlugResolver
 def resolver() -> SlugResolver:
     r = SlugResolver()
     r.load([
-        ItemRef(slug="mag_prime_set",               item_name="Mag Prime Set",            thumb_url=None, vaulted=False, wfm_id="1"),
-        ItemRef(slug="mag_prime_blueprint",         item_name="Mag Prime Blueprint",      thumb_url=None, vaulted=False, wfm_id="2"),
-        ItemRef(slug="mag_prime_helmet_blueprint",  item_name="Mag Prime Helmet BP",      thumb_url=None, vaulted=False, wfm_id="3"),
-        ItemRef(slug="mag_prime_chassis_blueprint", item_name="Mag Prime Chassis BP",     thumb_url=None, vaulted=False, wfm_id="4"),
-        ItemRef(slug="mag_prime_systems_blueprint", item_name="Mag Prime Systems BP",     thumb_url=None, vaulted=False, wfm_id="5"),
+        ItemRef(slug="mag_prime_set",                 item_name="Mag Prime Set",            thumb_url=None, vaulted=False, wfm_id="1"),
+        ItemRef(slug="mag_prime_blueprint",           item_name="Mag Prime Blueprint",      thumb_url=None, vaulted=False, wfm_id="2"),
+        ItemRef(slug="mag_prime_neuroptics_blueprint", item_name="Mag Prime Neuroptics BP",  thumb_url=None, vaulted=False, wfm_id="3"),
+        ItemRef(slug="mag_prime_chassis_blueprint",    item_name="Mag Prime Chassis BP",     thumb_url=None, vaulted=False, wfm_id="4"),
+        ItemRef(slug="mag_prime_systems_blueprint",    item_name="Mag Prime Systems BP",     thumb_url=None, vaulted=False, wfm_id="5"),
     ])
     return r
 
 
 def test_loader_builds_mag_prime_set(tmp_path: Path, resolver: SlugResolver) -> None:
-    fixture = Path(__file__).parent / "fixtures" / "aleca_warframes_sample.json"
+    fixture = FIXTURES_DIR / "aleca_warframes_sample.json"
     cached_dir = tmp_path
     (cached_dir / "Warframes.json").write_text(fixture.read_text(encoding="utf-8"), encoding="utf-8")
 
@@ -35,7 +36,7 @@ def test_loader_builds_mag_prime_set(tmp_path: Path, resolver: SlugResolver) -> 
     assert s.set_name == "Mag Prime Set"
     assert s.parts == {
         "mag_prime_blueprint": 1,
-        "mag_prime_helmet_blueprint": 1,
+        "mag_prime_neuroptics_blueprint": 1,
         "mag_prime_chassis_blueprint": 1,
         "mag_prime_systems_blueprint": 1,
     }

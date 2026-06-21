@@ -40,8 +40,5 @@ alecaframe-api = "alecaframe_api.main:run"
 alecaframe-decrypt-agent = "decrypt_agent.main:run"
 alecaframe-poller = "alecaframe_api.wfm.poller:run"
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-asyncio_mode = "auto"
-addopts = "-ra -q -m 'not e2e'"
-markers = ["e2e: requires a running docker-compose stack"]
+# pytest config lives in the repo-root pytest.ini (tests stay at the root while
+# this project lives in backend/). Run from the root: `uv run --project backend pytest`.

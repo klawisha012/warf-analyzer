@@ -31,10 +31,15 @@ export default function Sets() {
   useSlugChannel(visibleSlugs);
 
   return (
-    <div class="space-y-4">
-      <header class="flex items-center gap-3 flex-wrap">
-        <h1 class="text-2xl font-bold mr-auto">{t("sets.title")}</h1>
-        <label class="text-sm text-slate-400 flex items-center gap-2">
+    <div class="space-y-6">
+      {/* Telemetry Filter Toolbar */}
+      <header class="flex flex-wrap items-center justify-between gap-4 bg-slate-900/30 p-2.5 rounded-2xl border border-white/[0.02] backdrop-blur-md">
+        <h1 class="text-xl font-bold tracking-tight text-slate-100 px-2 font-sans flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]"></span>
+          {t("sets.title")}
+        </h1>
+        {/* Min Margin Calibration Control */}
+        <label class="text-xs font-semibold text-slate-400 flex items-center gap-2 font-mono uppercase tracking-wider bg-slate-950/60 p-1.5 rounded-xl border border-white/[0.02] px-3">
           {t("sets.minProfit")}
           <input
             type="number"
@@ -42,14 +47,21 @@ export default function Sets() {
             step={1}
             value={minMargin()}
             onInput={(e) => setMinMargin(Math.max(0, +e.currentTarget.value || 0))}
-            class="w-20 px-2 py-1 text-sm rounded-md bg-slate-900 border border-slate-800 text-slate-100"
+            class="w-16 text-center py-0.5 rounded-md bg-slate-900 border border-white/[0.06] text-emerald-400 focus:outline-none focus:border-emerald-500/40 text-xs font-bold font-mono"
           />
         </label>
       </header>
 
       <Show
         when={!sets.isLoading}
-        fallback={<Card><div class="text-slate-500">{t("common.loading")}</div></Card>}
+        fallback={
+          <Card class="flex items-center justify-center py-16">
+            <div class="flex flex-col items-center gap-3">
+              <div class="w-8 h-8 rounded-full border-2 border-emerald-500/20 border-t-emerald-400 animate-spin"></div>
+              <span class="text-xs font-mono uppercase tracking-widest text-slate-500 animate-pulse">{t("common.loading")}</span>
+            </div>
+          </Card>
+        }
       >
         <Show
           when={(sets.data?.items ?? []).length > 0}
@@ -60,7 +72,7 @@ export default function Sets() {
             />
           }
         >
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <For each={sets.data!.items}>{(row) => <SetRowComp row={row} />}</For>
           </div>
         </Show>

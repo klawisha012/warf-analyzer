@@ -14,13 +14,13 @@ ENV UV_LINK_MODE=copy \
 
 WORKDIR /app
 
-# Install deps first (cache-friendly layer)
-COPY pyproject.toml uv.lock ./
+# Install deps first (cache-friendly layer). Backend project lives in backend/.
+COPY backend/pyproject.toml backend/uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev
 
 # Now copy source and install the project itself
-COPY src ./src
+COPY backend/src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 

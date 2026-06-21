@@ -198,7 +198,7 @@ async def _floor_for(client, slug: str, *, online_only: bool) -> int | None:
 
 
 async def _fetch_one_into_store(
-    client: WFMClient, store: PriceStore, slug: str,
+    client: WFMClient, store: PriceStore, slug: str, max_rank: int | None = None,
 ) -> PriceStats | None:
     """Fetch a single slug's orders from WFM and write the projected PriceStats
     into the store. Returns the new record (or None on failure)."""
@@ -208,33 +208,50 @@ async def _fetch_one_into_store(
     except WFMError:
         return None
     orders = payload.get("data") or []
-    stats = stats_from_orders(slug, orders, now=_t.time(), stale=bool(payload.get("_stale")))
+    stats = stats_from_orders(slug, orders, now=_t.time(), stale=bool(payload.get("_stale")), max_rank=max_rank)
     store.set(stats)
     return stats
 
 
 async def ensure_prices(
-    client: WFMClient, store: PriceStore, slugs: list[str],
+    client: WFMClient,
+    store: PriceStore,
+    slugs: list[str],
+    max_ranks: dict[str, int] | None = None,
+    max_sync: int = 10,
 ) -> dict[str, PriceStats]:
     """Make sure every slug in `slugs` has a PriceStats in the store.
 
     For slugs already present: returns the cached value (the poller keeps it
     fresh once a frontend subscribes via Centrifugo).
-    For slugs absent: parallel-fetches from WFM and populates the store. WFM
-    failures degrade silently — the slug ends up missing from the result map,
-    matching the pre-PriceStore behaviour where price fields were None.
+    For slugs absent: parallel-fetches up to `max_sync` items from WFM synchronously, and
+    schedules the remainder in the background to prevent request gateway timeouts.
     """
     have = store.bulk_get(slugs)
     missing = [s for s in slugs if s not in have]
     if not missing:
         return have
 
+    mr_dict = max_ranks or {}
+    sync_batch = missing[:max_sync]
+    async_batch = missing[max_sync:]
+
     fetched = await asyncio.gather(
-        *[_fetch_one_into_store(client, store, s) for s in missing],
+        *[_fetch_one_into_store(client, store, s, mr_dict.get(s)) for s in sync_batch],
         return_exceptions=True,
     )
+
+    if async_batch:
+        async def _fetch_background():
+            for s in async_batch:
+                try:
+                    await _fetch_one_into_store(client, store, s, mr_dict.get(s))
+                except Exception as e:
+                    log.warning("background fetch for %s failed: %s", s, e)
+        asyncio.create_task(_fetch_background())
+
     out = dict(have)
-    for slug, res in zip(missing, fetched):
+    for slug, res in zip(sync_batch, fetched):
         if isinstance(res, PriceStats):
             out[slug] = res
     return out
@@ -633,3 +650,185 @@ async def me_relist_nudges(
 
     nudges.sort(key=lambda n: -n.your_price)
     return RelistNudgeResponse(total=len(nudges), items=nudges)
+
+
+@router.get(
+    "/me/mods-priced", response_model=PricedItemListResponse,
+    summary="Your mods enriched with WFM floor/median prices",
+)
+async def me_mods_priced(
+    br: BridgeDep,
+    rs: ResolverDep,
+    slug_resolver: SlugResolverDep,
+    client: WFMClientDep,
+    store: PriceStoreDep,
+    min_count: Annotated[int, Query(ge=1)] = 1,
+) -> PricedItemListResponse:
+    try:
+        data = await br.lastdata()
+    except BridgeError as e:
+        raise HTTPException(503, f"inventory unavailable: {e}") from e
+
+    # Extract mods from RawUpgrades
+    raw_mods = data.get("RawUpgrades") or []
+    enriched = rs.enrich(raw_mods)
+    
+    # Filter to only mods
+    mods_only = [it for it in enriched if it.get("category") == "mod"]
+    
+    # Aggregate by uniqueName
+    agg: dict[str, tuple[str, int]] = {}
+    for it in mods_only:
+        u = it.get("ItemType") or it.get("uniqueName") or ""
+        name = it.get("name") or ""
+        qty = int(it.get("ItemCount", 1) or 1)
+        if u:
+            prev_name, prev_qty = agg.get(u, (name, 0))
+            agg[u] = (name or prev_name, prev_qty + qty)
+
+    eligible = [(u, name, qty) for u, (name, qty) in agg.items() if qty >= min_count]
+    slugs_for: dict[str, str | None] = {
+        u: slug_resolver.resolve_unique_name(u, name) for u, name, _ in eligible
+    }
+    needed = [s for s in slugs_for.values() if s]
+
+    # Resolve max rank for each slug to pass to ensure_prices
+    slug_max_ranks: dict[str, int] = {}
+    for u, name, count in eligible:
+        slug = slugs_for[u]
+        if not slug:
+            continue
+        meta = rs.lookup(u) or {}
+        fusion_limit = meta.get("fusion_limit")
+        level_stats = meta.get("level_stats")
+        max_rank = 0
+        if fusion_limit is not None:
+            max_rank = int(fusion_limit)
+        elif level_stats:
+            max_rank = len(level_stats) - 1
+        slug_max_ranks[slug] = max_rank
+
+    # Use the highly optimized batch-caching pricing loader!
+    price_map = await ensure_prices(client, store, needed, max_ranks=slug_max_ranks)
+
+    rows: list[PricedItemEntry] = []
+    for u, name, count in eligible:
+        slug = slugs_for[u]
+        stats = price_map.get(slug) if slug else None
+        ref = slug_resolver.by_slug(slug) if slug else None
+        vaulted = ref.vaulted if ref else None
+
+        sell_min = stats.sell_min if stats else None
+        sell_median = stats.sell_median if stats else None
+        sell_spread = stats.sell_spread if stats else None
+        buy_max = stats.buy_max if stats else None
+        sell_min_max_rank = stats.sell_min_max_rank if stats else None
+        buy_max_max_rank = stats.buy_max_max_rank if stats else None
+        max_rank = slug_max_ranks.get(slug, 0) if slug else 0
+
+        rows.append(PricedItemEntry(
+            unique_name=u, name=name, slug=slug, count=count, vaulted=vaulted,
+            sell_min=sell_min,
+            sell_median=sell_median,
+            sell_spread=sell_spread,
+            buy_max=buy_max,
+            sell_min_max_rank=sell_min_max_rank,
+            buy_max_max_rank=buy_max_max_rank,
+            max_rank=max_rank,
+            estimated_value=(sell_min * count) if sell_min else None,
+            stale=stats.stale if stats else False,
+        ))
+
+    rows.sort(key=lambda r: -(r.estimated_value or 0))
+    return PricedItemListResponse(total=len(rows), returned=len(rows), items=rows)
+
+
+@router.get(
+    "/me/arcanes-priced", response_model=PricedItemListResponse,
+    summary="Your arcanes enriched with WFM floor/median prices",
+)
+async def me_arcanes_priced(
+    br: BridgeDep,
+    rs: ResolverDep,
+    slug_resolver: SlugResolverDep,
+    client: WFMClientDep,
+    store: PriceStoreDep,
+    min_count: Annotated[int, Query(ge=1)] = 1,
+) -> PricedItemListResponse:
+    try:
+        data = await br.lastdata()
+    except BridgeError as e:
+        raise HTTPException(503, f"inventory unavailable: {e}") from e
+
+    # Extract arcanes from RawUpgrades and MiscItems
+    enriched_upgrades = rs.enrich(data.get("RawUpgrades") or [])
+    enriched_misc = rs.enrich(data.get("MiscItems") or [])
+    
+    # Filter to only arcanes
+    arcanes_only = [it for it in enriched_upgrades + enriched_misc if it.get("category") == "arcane"]
+    
+    # Aggregate by uniqueName
+    agg: dict[str, tuple[str, int]] = {}
+    for it in arcanes_only:
+        u = it.get("ItemType") or it.get("uniqueName") or ""
+        name = it.get("name") or ""
+        qty = int(it.get("ItemCount", 1) or 1)
+        if u:
+            prev_name, prev_qty = agg.get(u, (name, 0))
+            agg[u] = (name or prev_name, prev_qty + qty)
+
+    eligible = [(u, name, qty) for u, (name, qty) in agg.items() if qty >= min_count]
+    slugs_for: dict[str, str | None] = {
+        u: slug_resolver.resolve_unique_name(u, name) for u, name, _ in eligible
+    }
+    needed = [s for s in slugs_for.values() if s]
+
+    # Resolve max rank for each slug to pass to ensure_prices
+    slug_max_ranks: dict[str, int] = {}
+    for u, name, count in eligible:
+        slug = slugs_for[u]
+        if not slug:
+            continue
+        meta = rs.lookup(u) or {}
+        fusion_limit = meta.get("fusion_limit")
+        level_stats = meta.get("level_stats")
+        max_rank = 0
+        if fusion_limit is not None:
+            max_rank = int(fusion_limit)
+        elif level_stats:
+            max_rank = len(level_stats) - 1
+        slug_max_ranks[slug] = max_rank
+
+    # Use the highly optimized batch-caching pricing loader!
+    price_map = await ensure_prices(client, store, needed, max_ranks=slug_max_ranks)
+
+    rows: list[PricedItemEntry] = []
+    for u, name, count in eligible:
+        slug = slugs_for[u]
+        stats = price_map.get(slug) if slug else None
+        ref = slug_resolver.by_slug(slug) if slug else None
+        vaulted = ref.vaulted if ref else None
+
+        sell_min = stats.sell_min if stats else None
+        sell_median = stats.sell_median if stats else None
+        sell_spread = stats.sell_spread if stats else None
+        buy_max = stats.buy_max if stats else None
+        sell_min_max_rank = stats.sell_min_max_rank if stats else None
+        buy_max_max_rank = stats.buy_max_max_rank if stats else None
+        max_rank = slug_max_ranks.get(slug, 0) if slug else 0
+
+        rows.append(PricedItemEntry(
+            unique_name=u, name=name, slug=slug, count=count, vaulted=vaulted,
+            sell_min=sell_min,
+            sell_median=sell_median,
+            sell_spread=sell_spread,
+            buy_max=buy_max,
+            sell_min_max_rank=sell_min_max_rank,
+            buy_max_max_rank=buy_max_max_rank,
+            max_rank=max_rank,
+            estimated_value=(sell_min * count) if sell_min else None,
+            stale=stats.stale if stats else False,
+        ))
+
+    rows.sort(key=lambda r: -(r.estimated_value or 0))
+    return PricedItemListResponse(total=len(rows), returned=len(rows), items=rows)

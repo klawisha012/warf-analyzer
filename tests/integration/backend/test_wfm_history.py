@@ -7,11 +7,12 @@ from pathlib import Path
 
 import pytest
 
+from tests import FIXTURES_DIR
 from alecaframe_api.db.repo import Repo
 from alecaframe_api.wfm.history import write_snapshot
 
 
-FIXTURE = Path(__file__).parent / "fixtures" / "wfm_orders_kronen_prime_blade.json"
+FIXTURE = FIXTURES_DIR / "wfm_orders_kronen_prime_blade.json"
 
 
 @pytest.fixture

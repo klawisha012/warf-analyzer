@@ -52,6 +52,7 @@ def compute_stats(
     side: Side,
     online_only: bool,
     platform: str = "pc",
+    mod_rank: int | None = None,
 ) -> OrderBookStats:
     """Aggregate a raw WFM v2 orders list into a single stats record."""
     filtered: list[dict] = []
@@ -60,6 +61,9 @@ def compute_stats(
             continue
         user = o.get("user") or {}
         if user.get("platform") != platform:
+            continue
+        actual_rank = o.get("rank") if o.get("rank") is not None else o.get("mod_rank")
+        if mod_rank is not None and actual_rank != mod_rank:
             continue
         # v2 adds `visible` — invisible orders are paused listings, skip them.
         if o.get("visible") is False:

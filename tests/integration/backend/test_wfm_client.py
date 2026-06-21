@@ -6,6 +6,7 @@ import asyncio
 import pytest
 from pytest_httpx import HTTPXMock
 
+from tests import FIXTURES_DIR
 from alecaframe_api.infra.cache import Cache
 from alecaframe_api.wfm.client import WFMClient
 
@@ -132,13 +133,13 @@ async def test_request_returns_stale_if_5xx_and_cache_has_value(
 async def test_get_items_returns_item_refs(client_factory, httpx_mock: HTTPXMock) -> None:
     import json
     from pathlib import Path
-    fixture = json.loads((Path(__file__).parent / "fixtures" / "wfm_items_sample.json").read_text(encoding="utf-8"))
+    fixture = json.loads((FIXTURES_DIR / "wfm_items_sample.json").read_text(encoding="utf-8"))
     httpx_mock.add_response(
         url="https://mock.wfm.test/v2/items", method="GET", json=fixture,
     )
     c = client_factory()
     items = await c.get_items()
-    assert len(items) == 6
+    assert len(items) == len(fixture["data"])
     kp = next(i for i in items if i.slug == "kronen_prime_blade")
     assert kp.item_name == "Kronen Prime Blade"
     # v2 listing omits vaulted — populated only by per-item /v2/items/{slug}.
@@ -150,7 +151,7 @@ async def test_get_orders_returns_payload(client_factory, httpx_mock: HTTPXMock)
     """v2: orders moved to /v2/orders/item/{slug} and return {"data": [...]}."""
     import json
     from pathlib import Path
-    fixture = json.loads((Path(__file__).parent / "fixtures" / "wfm_orders_kronen_prime_blade.json").read_text(encoding="utf-8"))
+    fixture = json.loads((FIXTURES_DIR / "wfm_orders_kronen_prime_blade.json").read_text(encoding="utf-8"))
     httpx_mock.add_response(
         url="https://mock.wfm.test/v2/orders/item/kronen_prime_blade", method="GET", json=fixture,
     )

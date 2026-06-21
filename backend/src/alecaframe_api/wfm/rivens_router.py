@@ -169,10 +169,27 @@ async def riven_auctions(
     )
     strategies = [RivenStrategyTip(**t) for t in tip_dicts]
 
+    # Dynamically extract negative attributes to avoid that are relevant to this weapon
+    seen_attrs: set[str] = set()
+    for a in auctions:
+        for at in (a.get("item") or {}).get("attributes") or []:
+            name = (at.get("url_name") or at.get("name") or "").lower().strip().replace(" ", "_").replace("-", "_")
+            if name:
+                seen_attrs.add(name)
+    from alecaframe_api.wfm.rivens_analysis import FATAL_NEGATIVES, HARMLESS_NEGATIVES
+    avoid = sorted(list(FATAL_NEGATIVES.intersection(seen_attrs)))
+    if not avoid:
+        avoid = sorted(list(FATAL_NEGATIVES))
+
+    harmless = sorted(list(HARMLESS_NEGATIVES.intersection(seen_attrs)))
+    if not harmless:
+        harmless = sorted(list(HARMLESS_NEGATIVES))
+
     return RivenAuctionsResponse(
         weapon_slug=weapon_slug, fetched_at=_now_iso(),
         stale=False, tiers=tiers_rows, stats=stats_models,
         outliers=outliers, top_attributes=top_attrs, strategies=strategies,
+        avoid_negatives=avoid, harmless_negatives=harmless,
     )
 
 

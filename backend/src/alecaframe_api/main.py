@@ -136,6 +136,19 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.warning("WFM /items bootstrap failed: %s; slug resolution will be empty until first /wfm/items call", e)
 
+    # Load ad-hoc overrides from data/slug_overrides.json if it exists
+    overrides_path = DATA_DIR / "slug_overrides.json"
+    if overrides_path.exists():
+        try:
+            import json
+            with open(overrides_path, "r", encoding="utf-8") as f:
+                overrides = json.load(f)
+                if isinstance(overrides, dict):
+                    slug_resolver.apply_overrides(overrides)
+                    log.info("loaded %d ad-hoc slug overrides from %s", len(overrides), overrides_path)
+        except Exception as e:
+            log.warning("failed to load slug overrides from %s: %s", overrides_path, e)
+
     set_idx = SetIndex()
     # Hardcoded fallback seed when neither DB nor AlecaFrame cachedData provides
     # set compositions. Quantities match WFM v2 `quantityInSet` per part:
@@ -192,6 +205,8 @@ async def lifespan(app: FastAPI):
         store=wfm_deps.price_store,
         wfm_client=wfm_client,
         publisher=centrifugo,
+        name_resolver=resolver,
+        slug_resolver=slug_resolver,
     )
     price_poller_task = asyncio.create_task(price_poller.run())
 

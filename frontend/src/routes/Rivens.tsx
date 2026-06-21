@@ -240,16 +240,36 @@ function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
     refetchInterval: 5 * 60_000,
   }));
 
-  const [onlineOnly, setOnlineOnly] = createSignal(false);
+  const [statusFilter, setStatusFilter] = createSignal<"all" | "online" | "ingame">("all");
   const [tierFilter, setTierFilter] = createSignal<TierName | "all">("all");
 
   // Filter applied to per-tier auction tables. Outliers / stats are
   // computed by the backend over the full dataset — filtering them too
   // would skew the discount math.
   function filterRows(rows: RivenAuctionRow[]): RivenAuctionRow[] {
-    if (!onlineOnly()) return rows;
+    const f = statusFilter();
+    if (f === "all") return rows;
+    if (f === "ingame") return rows.filter((r) => r.owner_status === "ingame");
     return rows.filter((r) => r.owner_status === "ingame" || r.owner_status === "online");
   }
+
+  const filteredOutliers = createMemo(() => {
+    const rawOutliers = auctions.data?.outliers ?? [];
+    const f = statusFilter();
+    if (f === "all") return rawOutliers;
+
+    return rawOutliers.filter((o) => {
+      // Find the corresponding auction row to check status
+      const tierRows = auctions.data?.tiers[o.tier as TierName] ?? [];
+      const row = tierRows.find((r) => r.auction_id === o.auction_id);
+      if (!row) return false;
+
+      if (f === "ingame") {
+        return row.owner_status === "ingame";
+      }
+      return row.owner_status === "ingame" || row.owner_status === "online";
+    });
+  });
 
   function visibleTiers(): { name: TierName; key: string }[] {
     const all = [
@@ -289,8 +309,8 @@ function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
         >
           {/* Filters bar */}
           <FiltersBar
-            onlineOnly={onlineOnly()}
-            setOnlineOnly={setOnlineOnly}
+            statusFilter={statusFilter()}
+            setStatusFilter={setStatusFilter}
             tierFilter={tierFilter()}
             setTierFilter={setTierFilter}
           />
@@ -302,13 +322,46 @@ function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
 
           {/* Outliers */}
           <Card title={t("rivens.outliersTitle")}>
-            <OutliersList outliers={auctions.data!.outliers} />
+            <OutliersList outliers={filteredOutliers()} />
           </Card>
 
-          {/* Top attributes */}
-          <Show when={auctions.data!.top_attributes.length > 0}>
+          {/* Top attributes & Negatives to avoid */}
+          <Show when={auctions.data!.top_attributes.length > 0 || (auctions.data!.avoid_negatives && auctions.data!.avoid_negatives.length > 0) || (auctions.data!.harmless_negatives && auctions.data!.harmless_negatives.length > 0)}>
             <Card title={t("rivens.topAttributes")}>
-              <TopAttrs attrs={auctions.data!.top_attributes} />
+              <div class="space-y-4">
+                <div>
+                  <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">{t("rivens.topPositives")}</h3>
+                  <TopAttrs attrs={auctions.data!.top_attributes} />
+                </div>
+                <Show when={auctions.data!.harmless_negatives && auctions.data!.harmless_negatives.length > 0}>
+                  <div>
+                    <h3 class="text-xs font-semibold text-sky-400/80 uppercase tracking-wider mb-2">{t("rivens.harmlessNegatives")}</h3>
+                    <ul class="flex flex-wrap gap-2">
+                      <For each={auctions.data!.harmless_negatives}>
+                        {(neg) => (
+                          <li class="text-xs px-2.5 py-1 rounded-xl bg-sky-950/20 border border-sky-900/30 text-sky-300 transition-all duration-300 hover:bg-sky-900/20 hover:border-sky-700/50 hover:shadow-[0_0_12px_rgba(56,189,248,0.05)]">
+                            -{prettyAttr(neg)}
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </div>
+                </Show>
+                <Show when={auctions.data!.avoid_negatives && auctions.data!.avoid_negatives.length > 0}>
+                  <div>
+                    <h3 class="text-xs font-semibold text-rose-500/80 uppercase tracking-wider mb-2">{t("rivens.avoidNegatives")}</h3>
+                    <ul class="flex flex-wrap gap-2">
+                      <For each={auctions.data!.avoid_negatives}>
+                        {(neg) => (
+                          <li class="text-xs px-2.5 py-1 rounded-xl bg-rose-950/20 border border-rose-900/30 text-rose-300 transition-all duration-300 hover:bg-rose-900/20 hover:border-rose-700/50 hover:shadow-[0_0_12px_rgba(244,63,94,0.05)]">
+                            -{prettyAttr(neg)}
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </div>
+                </Show>
+              </div>
             </Card>
           </Show>
 
@@ -320,12 +373,12 @@ function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
           {/* Per-tier tables */}
           <For each={visibleTiers()}>
             {(tier) => {
-              const rows = filterRows(auctions.data!.tiers[tier.name]);
+              const rows = createMemo(() => filterRows(auctions.data!.tiers[tier.name]));
               return (
-                <Show when={rows.length > 0}>
-                  <Card title={`${t(tier.key as never)} · ${rows.length}`}>
+                <Show when={rows().length > 0}>
+                  <Card title={`${t(tier.key as never)} · ${rows().length}`}>
                     <PaginatedAuctionTable
-                      rows={rows}
+                      rows={rows()}
                       outliers={auctions.data!.outliers}
                     />
                   </Card>
@@ -348,22 +401,35 @@ function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
 }
 
 function FiltersBar(p: {
-  onlineOnly: boolean;
-  setOnlineOnly: (v: boolean) => void;
+  statusFilter: "all" | "online" | "ingame";
+  setStatusFilter: (v: "all" | "online" | "ingame") => void;
   tierFilter: TierName | "all";
   setTierFilter: (v: TierName | "all") => void;
 }) {
   return (
     <div class="flex flex-wrap items-center gap-3 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800">
-      <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={p.onlineOnly}
-          onChange={(e) => p.setOnlineOnly(e.currentTarget.checked)}
-          class="accent-emerald-500"
-        />
-        {t("rivens.onlineOnly")}
-      </label>
+      <div class="flex items-center gap-1">
+        <span class="text-xs text-slate-500 mr-1">{t("rivens.statusFilter")}:</span>
+        <For each={[
+          { v: "all" as const,    label: t("rivens.statusAll") },
+          { v: "online" as const, label: t("rivens.statusOnline") },
+          { v: "ingame" as const, label: t("rivens.statusIngame") },
+        ]}>
+          {(opt) => (
+            <button
+              type="button"
+              onClick={() => p.setStatusFilter(opt.v)}
+              class="px-2 py-1 text-xs rounded-md border transition-colors"
+              classList={{
+                "bg-slate-800 border-slate-700 text-slate-100": p.statusFilter === opt.v,
+                "border-slate-800 text-slate-400 hover:text-slate-200": p.statusFilter !== opt.v,
+              }}
+            >
+              {opt.label}
+            </button>
+          )}
+        </For>
+      </div>
       <div class="flex items-center gap-1">
         <span class="text-xs text-slate-500 mr-1">{t("rivens.tier")}:</span>
         <For each={[
@@ -468,33 +534,70 @@ function TierStatsTable(props: { stats: RivenTierStats[] }) {
 }
 
 function OutliersList(props: { outliers: RivenOutlier[] }) {
+  const [page, setPage] = createSignal(0);
+  const outliersPageSize = 8;
+  const totalPages = createMemo(() => Math.max(1, Math.ceil(props.outliers.length / outliersPageSize)));
+  createMemo(() => {
+    if (page() >= totalPages()) setPage(0);
+  });
+  const pageOutliers = createMemo(() => {
+    const start = page() * outliersPageSize;
+    return props.outliers.slice(start, start + outliersPageSize);
+  });
+
   return (
     <Show
       when={props.outliers.length > 0}
       fallback={<div class="text-sm text-slate-500">{t("rivens.outliersEmpty")}</div>}
     >
-      <ul class="space-y-1">
-        <For each={props.outliers}>
-          {(o) => (
-            <li>
-              <a
-                href={auctionUrl(o.auction_id)}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="flex items-center justify-between gap-2 text-sm px-2 py-1 rounded hover:bg-slate-800 transition-colors"
-              >
-                <code class="text-xs text-slate-500 group-hover:text-slate-400 font-mono truncate">{o.auction_id}</code>
-                <span class="text-emerald-300 font-mono">
-                  {t("rivens.outlierItem", {
-                    price: fmtPlat(o.price), pct: o.discount_pct,
-                    median: fmtPlat(o.historical_median), tier: o.tier,
-                  })}
-                </span>
-              </a>
-            </li>
-          )}
-        </For>
-      </ul>
+      <div class="space-y-2">
+        <ul class="space-y-1.5">
+          <For each={pageOutliers()}>
+            {(o) => (
+              <li>
+                <a
+                  href={auctionUrl(o.auction_id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex items-center justify-between gap-2 text-sm px-3 py-1.5 rounded-xl transition-all duration-300 bg-slate-950/40 border border-slate-900 hover:bg-slate-800/30 hover:border-slate-700/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.02)]"
+                >
+                  <code class="text-xs text-slate-500 group-hover:text-slate-400 font-mono truncate">{o.auction_id}</code>
+                  <span class="text-emerald-400 font-mono font-medium">
+                    {t("rivens.outlierItem", {
+                      price: fmtPlat(o.price), pct: o.discount_pct,
+                      median: fmtPlat(o.historical_median), tier: o.tier,
+                    })}
+                  </span>
+                </a>
+              </li>
+            )}
+          </For>
+        </ul>
+
+        <Show when={totalPages() > 1}>
+          <div class="flex items-center justify-between text-xs text-slate-400 pt-1">
+            <button
+              type="button"
+              disabled={page() === 0}
+              onClick={() => setPage(page() - 1)}
+              class="px-2.5 py-1 rounded-lg border border-slate-800 hover:text-slate-200 hover:bg-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              ←
+            </button>
+            <span class="font-mono text-slate-500 text-[11px]">
+              {page() + 1} / {totalPages()} · {props.outliers.length} {t("rivens.lots")}
+            </span>
+            <button
+              type="button"
+              disabled={page() >= totalPages() - 1}
+              onClick={() => setPage(page() + 1)}
+              class="px-2.5 py-1 rounded-lg border border-slate-800 hover:text-slate-200 hover:bg-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              →
+            </button>
+          </div>
+        </Show>
+      </div>
     </Show>
   );
 }
@@ -504,8 +607,8 @@ function TopAttrs(props: { attrs: RivenTopAttribute[] }) {
     <ul class="flex flex-wrap gap-2">
       <For each={props.attrs}>
         {(a) => (
-          <li class="text-xs px-2 py-1 rounded bg-slate-800 text-slate-200">
-            {prettyAttr(a.name)} · {Math.round(a.share * 100)}%
+          <li class="text-xs px-2.5 py-1 rounded-xl bg-emerald-950/20 border border-emerald-900/30 text-emerald-300 transition-all duration-300 hover:bg-emerald-900/20 hover:border-emerald-700/50 hover:shadow-[0_0_12px_rgba(16,185,129,0.05)]">
+            {prettyAttr(a.name)}
           </li>
         )}
       </For>
@@ -626,11 +729,13 @@ function HistorySparkline(props: {
     const minV = Math.min(...ms.map((p) => p.v));
     const maxV = Math.max(...ms.map((p) => p.v));
     const W = 600, H = 80;
+    const padding = 6;
+    const chartHeight = H - 2 * padding;
     const xRange = Math.max(1, maxTs - minTs);
     const yRange = Math.max(1, maxV - minV);
     return ms.map((p, i) => {
       const x = ((p.ts - minTs) / xRange) * W;
-      const y = H - ((p.v - minV) / yRange) * H;
+      const y = H - padding - ((p.v - minV) / yRange) * chartHeight;
       return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
     }).join(" ");
   });
@@ -654,7 +759,7 @@ function HistorySparkline(props: {
             {fmtPlat(usable()[0]!.v)} → {fmtPlat(usable()[usable().length - 1]!.v)}
           </span>
         </div>
-        <svg viewBox="0 0 600 80" class="w-full" preserveAspectRatio="none">
+        <svg viewBox="0 0 600 80" class="w-full h-20" preserveAspectRatio="none">
           <path d={points()} stroke="#10b981" stroke-width="1.5" fill="none" />
         </svg>
       </Show>

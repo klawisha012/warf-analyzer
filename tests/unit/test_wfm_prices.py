@@ -6,9 +6,10 @@ from pathlib import Path
 
 import pytest
 
+from tests import FIXTURES_DIR
 from alecaframe_api.wfm.prices import compute_stats, OrderBookStats
 
-FIXTURE = Path(__file__).parent / "fixtures" / "wfm_orders_kronen_prime_blade.json"
+FIXTURE = FIXTURES_DIR / "wfm_orders_kronen_prime_blade.json"
 
 
 def load_orders() -> list[dict]:

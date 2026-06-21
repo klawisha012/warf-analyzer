@@ -156,6 +156,9 @@ class PricedItemEntry(BaseModel):
     sell_spread: int | None = None
     buy_max: int | None = None
     estimated_value: int | None = None
+    sell_min_max_rank: int | None = None
+    buy_max_max_rank: int | None = None
+    max_rank: int | None = None
     stale: bool = False
     used_in: list[ItemUseRef] = []
 
@@ -306,6 +309,8 @@ class RivenAuctionsResponse(BaseModel):
     outliers: list[RivenOutlier]
     top_attributes: list[RivenTopAttribute]
     strategies: list[RivenStrategyTip]
+    avoid_negatives: list[str] = []
+    harmless_negatives: list[str] = []
 
 
 class RivenWatchEntry(BaseModel):

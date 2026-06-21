@@ -28,3 +28,18 @@ frontend/.vite
 # Env files
 .env
 .superpowers/
+
+# graphify knowledge graph (generated, regenerable from source)
+graphify-out/
+
+# Design exploration scratch (mockups, experiments — not shipped)
+scratch/
+
+# Claude Code / harness state (local-only)
+.claude/
+
+# design-sync tool artifacts
+.design-sync/
+
+# one-off generated probe output
+scripts/probe_dll_output.json

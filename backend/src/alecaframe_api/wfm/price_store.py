@@ -33,6 +33,9 @@ class PriceStats:
     buy_max: int | None
     fetched_at: float           # unix timestamp; used by stale_slugs()
     stale: bool = False         # True if fetched_at is from a stale-fallback (WFM down)
+    sell_min_max_rank: int | None = None
+    buy_max_max_rank: int | None = None
+    max_rank: int | None = None
 
 
 class PriceStore:

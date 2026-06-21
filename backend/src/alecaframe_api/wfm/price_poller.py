@@ -52,7 +52,7 @@ def slugs_from_channels(channels: Iterable[str]) -> set[str]:
 
 
 def stats_from_orders(
-    slug: str, orders: list[dict], *, now: float, stale: bool = False,
+    slug: str, orders: list[dict], *, now: float, stale: bool = False, max_rank: int | None = None,
 ) -> PriceStats:
     """Project a raw WFM orders list into a PriceStats record.
 
@@ -60,13 +60,24 @@ def stats_from_orders(
     down and we served whatever was in Redis). UI distinguishes a real price
     from a "last known" price.
     """
-    sell = compute_stats(orders, side="sell", online_only=True)
-    buy = compute_stats(orders, side="buy", online_only=True)
+    # Only filter by mod_rank if it's a mod/arcane (max_rank is not None)
+    rank_base = 0 if max_rank is not None else None
+    sell = compute_stats(orders, side="sell", online_only=True, mod_rank=rank_base)
+    buy = compute_stats(orders, side="buy", online_only=True, mod_rank=rank_base)
     spread = (
         (sell.max_price - sell.min_price)
         if sell.min_price is not None and sell.max_price is not None
         else None
     )
+
+    sell_min_max_rank = None
+    buy_max_max_rank = None
+    if max_rank is not None:
+        sell_max = compute_stats(orders, side="sell", online_only=True, mod_rank=max_rank)
+        buy_max = compute_stats(orders, side="buy", online_only=True, mod_rank=max_rank)
+        sell_min_max_rank = sell_max.min_price
+        buy_max_max_rank = buy_max.max_price
+
     return PriceStats(
         slug=slug,
         sell_min=sell.min_price,
@@ -75,6 +86,9 @@ def stats_from_orders(
         buy_max=buy.max_price,
         fetched_at=now,
         stale=stale,
+        sell_min_max_rank=sell_min_max_rank,
+        buy_max_max_rank=buy_max_max_rank,
+        max_rank=max_rank,
     )
 
 
@@ -85,6 +99,8 @@ class PricePoller:
     publisher: CentrifugoPublisher
     poll_interval: float = DEFAULT_POLL_INTERVAL_S
     stale_threshold: float = DEFAULT_STALE_THRESHOLD_S
+    name_resolver: Any = None
+    slug_resolver: Any = None
 
     async def tick(self) -> None:
         """Run one poll cycle. Safe to call from tests directly."""
@@ -115,7 +131,25 @@ class PricePoller:
             return
         orders = payload.get("data") or []
         is_stale = bool(payload.get("_stale"))
-        stats = stats_from_orders(slug, orders, now=time.time(), stale=is_stale)
+
+        # Determine max_rank if it's a mod or arcane
+        max_rank = None
+        existing = self.store.get(slug)
+        if existing and existing.max_rank is not None:
+            max_rank = existing.max_rank
+        elif self.name_resolver and self.slug_resolver:
+            ref = self.slug_resolver.by_slug(slug)
+            if ref:
+                meta = self.name_resolver.lookup_by_name(ref.item_name)
+                if meta:
+                    fusion_limit = meta.get("fusion_limit")
+                    level_stats = meta.get("level_stats")
+                    if fusion_limit is not None:
+                        max_rank = int(fusion_limit)
+                    elif level_stats:
+                        max_rank = len(level_stats) - 1
+
+        stats = stats_from_orders(slug, orders, now=time.time(), stale=is_stale, max_rank=max_rank)
         self.store.set(stats)
         await self.publisher.publish(
             f"{PRICE_CHANNEL_PREFIX}{slug}",
@@ -127,6 +161,9 @@ class PricePoller:
                 "buy_max": stats.buy_max,
                 "fetched_at": stats.fetched_at,
                 "stale": stats.stale,
+                "sell_min_max_rank": stats.sell_min_max_rank,
+                "buy_max_max_rank": stats.buy_max_max_rank,
+                "max_rank": stats.max_rank,
             },
         )
 

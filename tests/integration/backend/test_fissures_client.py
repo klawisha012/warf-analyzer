@@ -6,11 +6,12 @@ from pathlib import Path
 import pytest
 from pytest_httpx import HTTPXMock
 
+from tests import FIXTURES_DIR
 from alecaframe_api.fissures.client import FissureClient, FissureClientError
 
 
 def _fixture() -> list[dict]:
-    p = Path(__file__).parent / "fixtures" / "wfm_fissures_sample.json"
+    p = FIXTURES_DIR / "wfm_fissures_sample.json"
     return json.loads(p.read_text(encoding="utf-8"))
 
 

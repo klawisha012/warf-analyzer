@@ -45,37 +45,144 @@ class Outlier:
     discount_pct: int   # 100 * (1 - price/historical_median), rounded
 
 
+# Highly valued premium positive stats for weapons (rifles, pistols, shotguns, melee)
+GOD_POSITIVES = {
+    # Offense / Crits
+    "multishot", "critical_damage", "critical_chance", "damage", "melee_damage",
+    # Elements (highly valued for combining viral/corrosive/heat)
+    "toxin", "cold", "heat", "electricity",
+    # Melee meta / speeds
+    "range", "attack_speed", "fire_rate", "status_chance",
+    # Additional high tier
+    "slash", "elemental_damage", "critical_chance_on_slide"
+}
+
+# Fatal negative curses that ruin the mod performance (making it trash/low-tier)
+FATAL_NEGATIVES = {
+    "damage", "melee_damage", "multishot", "critical_damage", "critical_chance",
+    "status_chance", "range", "attack_speed", "fire_rate", "slash",
+    # Negative elements also ruin viral/corrosive combos
+    "toxin", "cold", "heat", "electricity",
+    # Negative faction damage is also fatal
+    "damage_to_grineer", "damage_to_corpus", "damage_to_infested"
+}
+
+# Harmless negatives that boost positive stats without hurting performance
+HARMLESS_NEGATIVES = {
+    "zoom", "maximum_ammo", "ammo_maximum", "magazine_capacity", "finisher_damage",
+    "slide_attack_critical_chance", "projectile_speed", "flight_speed",
+    "status_duration", "recoil", "impact", "puncture"
+}
+
+
 def _buyout(a: dict) -> int | None:
     v = a.get("buyout_price")
     return int(v) if isinstance(v, (int, float)) else None
 
 
-def classify_tiers(auctions: list[dict]) -> dict[str, list[dict]]:
-    """Split auctions into god/mid/low buckets by buyout price quartile.
+def eval_riven_quality(a: dict) -> str | None:
+    """Evaluate Riven attributes to detect 'god', 'mid', or 'low' characteristics.
 
-    Auctions without a buyout_price are dropped (they're interactive-only and
-    don't fit a single-price comparison).
+    Returns:
+      - 'low': if it has a fatal negative or extremely poor positive stats.
+      - 'god': if it has 2+ premium positive stats and no negative or a harmless negative.
+      - None: if it's standard mid-tier material.
+    """
+    item = a.get("item") or {}
+    attributes = item.get("attributes") or []
+    if not attributes:
+        return None
+
+    positives = []
+    negatives = []
+    for at in attributes:
+        name = (at.get("url_name") or at.get("name") or "").lower().strip().replace(" ", "_").replace("-", "_")
+        positive = bool(at.get("positive"))
+        if positive:
+            positives.append(name)
+        else:
+            negatives.append(name)
+
+    # Fatal Negatives - immediately trash/low-tier
+    for neg in negatives:
+        if neg in FATAL_NEGATIVES:
+            return "low"
+
+    # Count premium positive stats
+    premium_pos_count = sum(1 for pos in positives if pos in GOD_POSITIVES)
+
+    # If it has a negative stat, is it harmless?
+    has_bad_negative = False
+    for neg in negatives:
+        if neg not in HARMLESS_NEGATIVES:
+            has_bad_negative = True
+            break
+
+    # God Tier criteria:
+    # 2+ premium positives AND (either no negative or a harmless negative)
+    if premium_pos_count >= 2 and not has_bad_negative:
+        return "god"
+
+    # Low Tier criteria:
+    # 0 premium positives (e.g. only utility stats like zoom, ammo maximum, slide critical as positives)
+    if premium_pos_count == 0:
+        return "low"
+
+    return None
+
+
+def classify_tiers(auctions: list[dict]) -> dict[str, list[dict]]:
+    """Split auctions into god/mid/low buckets using a smart hybrid model.
+
+    We combine:
+    1. Market Price (buyout quartile splits).
+    2. Stat Evaluation (demoting mods with fatal curses/negatives, promoting
+       mods with ideal positive rolls + harmless negatives).
+
+    This prevents troll/scam listings (e.g. a trash mod with -damage listed for 10000p)
+    from skewing the 'god' tier stats, and accurately flags actual high-value items.
     """
     priced = [a for a in auctions if _buyout(a) is not None]
     priced.sort(key=lambda a: _buyout(a) or 0)
     n = len(priced)
     if n == 0:
         return {"god": [], "mid": [], "low": []}
+
+    # 1. Base classification using price quartiles
+    # This acts as our default fallback
+    base_tiers: dict[str, list[dict]] = {"god": [], "mid": [], "low": []}
     if n < 4:
-        # Not enough data for quartile split — treat the cheapest as low,
-        # the most expensive as god, anything else as mid.
-        return {
-            "low": priced[:1],
-            "mid": priced[1:-1],
-            "god": priced[-1:] if n > 1 else [],
-        }
-    q1 = n // 4
-    q3 = (3 * n) // 4
-    return {
-        "low": priced[:q1],
-        "mid": priced[q1:q3],
-        "god": priced[q3:],
-    }
+        base_tiers["low"] = priced[:1]
+        base_tiers["mid"] = priced[1:-1]
+        base_tiers["god"] = priced[-1:] if n > 1 else []
+    else:
+        q1 = n // 4
+        q3 = (3 * n) // 4
+        base_tiers["low"] = priced[:q1]
+        base_tiers["mid"] = priced[q1:q3]
+        base_tiers["god"] = priced[q3:]
+
+    # 2. Refine based on Riven attribute quality (Smart Overrides)
+    final_tiers: dict[str, list[dict]] = {"god": [], "mid": [], "low": []}
+
+    for a in priced:
+        quality = eval_riven_quality(a)
+        if quality == "low":
+            # Demote immediately to low tier regardless of listing price
+            final_tiers["low"].append(a)
+        elif quality == "god":
+            # Promote to god tier if it has genuine god-roll stats
+            final_tiers["god"].append(a)
+        else:
+            # Fallback to its price-based classification
+            if a in base_tiers["low"]:
+                final_tiers["low"].append(a)
+            elif a in base_tiers["god"]:
+                final_tiers["god"].append(a)
+            else:
+                final_tiers["mid"].append(a)
+
+    return final_tiers
 
 
 def compute_tier_stats(auctions: list[dict]) -> TierStats:

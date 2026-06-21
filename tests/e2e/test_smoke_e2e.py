@@ -11,10 +11,12 @@ from pathlib import Path
 import pytest
 import httpx
 
+from tests import REPO_ROOT
+
 
 def _centrifugo_api_key() -> str:
     """Read CENTRIFUGO_API_KEY from .env (dev default if not found)."""
-    env_file = Path(__file__).parent.parent / ".env"
+    env_file = REPO_ROOT / ".env"
     if env_file.exists():
         for line in env_file.read_text().splitlines():
             if line.startswith("CENTRIFUGO_API_KEY="):
@@ -107,3 +109,19 @@ def test_proxied_wfm_items_via_frontend() -> None:
     r = httpx.get("http://127.0.0.1:3000/api/wfm/items", timeout=10)
     assert r.status_code == 200
     assert r.json()["total"] > 1000
+
+
+@pytest.mark.e2e
+def test_me_mods_priced() -> None:
+    r = httpx.get("http://127.0.0.1:8765/me/mods-priced", timeout=20)
+    assert r.status_code == 200
+    body = r.json()
+    assert "items" in body
+
+
+@pytest.mark.e2e
+def test_me_arcanes_priced() -> None:
+    r = httpx.get("http://127.0.0.1:8765/me/arcanes-priced", timeout=20)
+    assert r.status_code == 200
+    body = r.json()
+    assert "items" in body
