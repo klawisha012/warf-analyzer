@@ -254,6 +254,15 @@ class Repo:
             rows = await cursor.fetchall()
         return [self._base_stats_row(dict(zip(cols, r))) for r in rows]
 
+    async def weapon_base_stats_index(self) -> dict[str, dict[str, Any]]:
+        """`{normalized lowercased name: row}` for the riven name-join.
+
+        WFM riven slugs don't map to WFCD `uniqueName` deterministically, so
+        the scorer joins by display name (see `riven_scoring.resolve_weapon`).
+        """
+        rows = await self.list_base_stats(limit=10000)
+        return {(r.get("name") or "").strip().lower(): r for r in rows if r.get("name")}
+
     # ----------------------------------------------------------- live events
 
     async def append_live_event(

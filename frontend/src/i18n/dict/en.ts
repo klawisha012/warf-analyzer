@@ -136,6 +136,7 @@ export const en = {
     tier:            "Tier",
     lots:            "lots",
     colId:           "ID",
+    colGrade:        "Grade",
     colPrice:        "Price",
     colStarting:     "Start",
     colTopBid:       "Top bid",

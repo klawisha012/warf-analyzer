@@ -34,6 +34,9 @@ from alecaframe_api.wfm.rivens_analysis import (
     classify_tiers, compute_tier_stats, detect_outliers,
     suggest_strategies, summarize_attributes,
 )
+from alecaframe_api.wfm.riven_scoring import (
+    Profile, build_profiles, is_scoreable_category, resolve_weapon, score_riven,
+)
 
 log = logging.getLogger("alecaframe.wfm.rivens_router")
 
@@ -55,7 +58,11 @@ def _now_iso() -> str:
     return _dt.datetime.now(_dt.UTC).isoformat()
 
 
-def _to_row(a: dict, tier: str) -> RivenAuctionRow:
+def _to_row(
+    a: dict, tier: str, *,
+    profiles: list[Profile] | None = None,
+    weapon_unscored_reason: str | None = None,
+) -> RivenAuctionRow:
     item = a.get("item") or {}
     owner = a.get("owner") or {}
     attrs = []
@@ -65,6 +72,19 @@ def _to_row(a: dict, tier: str) -> RivenAuctionRow:
             "value": at.get("value") or 0,
             "positive": bool(at.get("positive")),
         })
+
+    grade = score = None
+    unscored = False
+    reason = None
+    if profiles:
+        rs = score_riven(attrs, profiles)
+        if rs.unscored:
+            unscored, reason = True, rs.reason
+        else:
+            grade, score = rs.headline.grade, rs.headline.score
+    elif weapon_unscored_reason:
+        unscored, reason = True, weapon_unscored_reason
+
     return RivenAuctionRow(
         auction_id=str(a.get("id") or ""),
         weapon_slug=item.get("weapon_url_name") or "",
@@ -78,7 +98,38 @@ def _to_row(a: dict, tier: str) -> RivenAuctionRow:
         owner_status=owner.get("status"),
         tier=tier,
         attributes=attrs,
+        grade=grade,
+        score=score,
+        unscored=unscored,
+        unscored_reason=reason,
     )
+
+
+async def _resolve_weapon_profiles(
+    weapon_slug: str, client: WFMAuctionClient, repo,
+) -> tuple[list[Profile], str | None]:
+    """Resolve a weapon's scoring profiles via slug -> item_name -> base stats.
+
+    Returns (profiles, unscored_reason). profiles is empty and a reason is set
+    when the weapon can't be scored (no base profile, melee, fetch failure).
+    """
+    try:
+        weapons = await client.get_riven_weapons()
+    except WFMAuctionError:
+        return [], "no_base_profile"
+    item_name = next(
+        (w.get("item_name") for w in weapons if w.get("url_name") == weapon_slug), None,
+    )
+    if not item_name:
+        return [], "no_base_profile"
+    base_row = resolve_weapon(item_name, await repo.weapon_base_stats_index())
+    if base_row is None:
+        return [], "no_base_profile"
+    category = base_row.get("category")
+    if not is_scoreable_category(category):
+        reason = "melee_out_of_scope_m1" if category in ("melee", "arch_melee") else "category_out_of_scope_m1"
+        return [], reason
+    return build_profiles(base_row), None
 
 
 def _safe_int(v) -> int | None:
@@ -112,9 +163,16 @@ async def riven_auctions(
     except WFMAuctionError as e:
         raise HTTPException(503, str(e)) from e
 
+    # Resolve the weapon's scoring profiles once per request (not per auction).
+    profiles, weapon_unscored_reason = await _resolve_weapon_profiles(weapon_slug, client, repo)
+
     tiers_raw = classify_tiers(auctions)
     tiers_rows: dict[str, list[RivenAuctionRow]] = {
-        name: [_to_row(a, name) for a in tiers_raw[name]] for name in ("god", "mid", "low")
+        name: [
+            _to_row(a, name, profiles=profiles, weapon_unscored_reason=weapon_unscored_reason)
+            for a in tiers_raw[name]
+        ]
+        for name in ("god", "mid", "low")
     }
 
     # Stats per tier + overall

@@ -66,7 +66,12 @@ def _norm_weapon(it: dict[str, Any]) -> dict[str, Any]:
         "status_chance": _r(it.get("procChance")),
         "total_damage": _r(it.get("totalDamage")),
         "damage": {k: _r(v) for k, v in (it.get("damage") or {}).items() if v},
+        # `disposition` (top-level row) is WFCD's 1-5 dot-rank; the riven-scoring
+        # multiplier is `omegaAttenuation` (Torid 1.3, Kuva Bramma 0.65).
+        "omega_attenuation": _r(it.get("omegaAttenuation")),
         "trigger": it.get("trigger"),
+        # `type` distinguishes Launcher/Beam etc. for multishot weighting.
+        "type": it.get("type"),
         "slot": it.get("slot"),
         "is_prime": it.get("isPrime"),
     }

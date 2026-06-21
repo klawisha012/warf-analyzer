@@ -137,6 +137,7 @@ export const ru = {
     tier:            "Тир",
     lots:            "лотов",
     colId:           "ID",
+    colGrade:        "Оценка",
     colPrice:        "Цена",
     colStarting:     "Старт",
     colTopBid:       "Топ-бид",

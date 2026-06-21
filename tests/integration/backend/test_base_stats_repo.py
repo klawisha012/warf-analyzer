@@ -56,6 +56,22 @@ async def test_upsert_is_idempotent_and_updates(repo: Repo) -> None:
 
 
 @pytest.mark.asyncio
+async def test_weapon_base_stats_index_keys_by_normalized_name(repo: Repo) -> None:
+    # The riven name-join (CRITICAL-1 fix) relies on a name-keyed index because
+    # WFM slugs don't map to WFCD uniqueName deterministically.
+    await repo.upsert_base_stats([
+        {"unique_name": "/Lotus/Weapons/ClanTech/Bio/BioWeapon", "category": "primary",
+         "name": "Torid", "disposition": 4, "stats": {"crit_chance": 0.15}, "source": "wfcd"},
+        {"unique_name": "/Lotus/Weapons/Grineer/Bows/GrnBow/GrnBowWeapon", "category": "primary",
+         "name": "Kuva Bramma", "disposition": 1, "stats": {"crit_chance": 0.27}, "source": "wfcd"},
+    ])
+    index = await repo.weapon_base_stats_index()
+    assert index["torid"]["name"] == "Torid"                  # lowercased key
+    assert index["kuva bramma"]["name"] == "Kuva Bramma"      # multi-word survives
+    assert index["torid"]["stats"]["crit_chance"] == 0.15     # stats blob round-trips
+
+
+@pytest.mark.asyncio
 async def test_list_filters_by_category(repo: Repo) -> None:
     await repo.upsert_base_stats([
         _frame_row("/wf/a", "Ash"),

@@ -70,6 +70,25 @@ def test_build_rows_weapon_maps_and_rounds() -> None:
     assert s["damage"] == {"impact": 26, "puncture": 35.2, "slash": 8.8}
 
 
+def test_build_rows_weapon_captures_omega_attenuation_and_type() -> None:
+    # WFCD ships the riven-disposition *multiplier* as `omegaAttenuation`
+    # (Torid=1.3), while `disposition` is the cosmetic 1-5 dot-rank. The scorer
+    # needs the multiplier; `type` is needed to down-weight multishot on
+    # beam/AoE weapons (e.g. Launcher).
+    items = [{
+        "name": "Torid",
+        "uniqueName": "/Lotus/Weapons/ClanTech/Bio/BioWeapon",
+        "criticalChance": 0.15,
+        "disposition": 4,
+        "omegaAttenuation": 1.2999999,   # float noise → rounded
+        "type": "Launcher",
+        "trigger": "Semi",
+    }]
+    s = build_rows("primary", items, _norm_weapon)[0]["stats"]
+    assert s["omega_attenuation"] == 1.3
+    assert s["type"] == "Launcher"
+
+
 def test_build_rows_skips_entries_without_unique_name() -> None:
     rows = build_rows("warframe", [{"name": "NoKey"}], _norm_frame)
     assert rows == []

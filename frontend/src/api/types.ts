@@ -174,6 +174,12 @@ export type RivenAuctionRow = {
   owner_status: string | null;       // 'ingame' | 'online' | 'offline'
   tier: string;
   attributes: RivenAuctionAttribute[];
+  // Weapon-aware quality score (base profile in M1). grade/score are null when
+  // unscored (no base profile / melee — reason in unscored_reason).
+  grade: string | null;
+  score: number | null;
+  unscored: boolean;
+  unscored_reason: string | null;
 };
 
 export type RivenTierStats = {
