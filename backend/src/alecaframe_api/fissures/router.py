@@ -28,6 +28,11 @@ KNOWN_MISSION_TYPES = [
     "Orphix", "Rescue", "Sabotage", "Skirmish", "Spy", "Survival",
     "Void Cascade", "Void Flood", "Volatile",
 ]
+KNOWN_PLANETS = [
+    "Mercury", "Venus", "Earth", "Lua", "Mars", "Deimos", "Phobos",
+    "Ceres", "Jupiter", "Europa", "Saturn", "Uranus", "Neptune", "Pluto",
+    "Sedna", "Eris", "Void", "Kuva Fortress", "Zariman", "Höllvania",
+]
 
 
 def _eta_seconds(expiry: str | None, now: float) -> int | None:
@@ -53,6 +58,7 @@ def _norm_sub(r: dict) -> dict:
         return None if v is None else bool(v)
     return {
         "id": r["id"], "era": r["era"], "mission_type": r["mission_type"],
+        "planet": r["planet"], "node": r["node"],
         "is_hard": _b(r["is_hard"]), "is_storm": _b(r["is_storm"]),
         "enabled": bool(r["enabled"]), "created_at": r["created_at"],
     }
@@ -71,16 +77,25 @@ async def list_fissures(client: FissureClientDep) -> FissuresResponse:
 
 
 @router.get("/meta", response_model=FissureMetaResponse,
-            summary="All possible fissure axes (eras + mission types)")
+            summary="All fissure axes (eras, mission types, planets, live nodes)")
 async def fissures_meta(client: FissureClientDep) -> FissureMetaResponse:
-    live: set[str] = set()
+    live_missions: set[str] = set()
+    live_planets: set[str] = set()
+    live_nodes: set[str] = set()
     try:
         for f in await client.get_fissures():
-            live.add(f.mission_type)
+            live_missions.add(f.mission_type)
+            if f.planet:
+                live_planets.add(f.planet)
+            if f.node:
+                live_nodes.add(f.node)
     except FissureClientError:
         pass
     return FissureMetaResponse(
-        eras=ERAS, mission_types=sorted(set(KNOWN_MISSION_TYPES) | live),
+        eras=ERAS,
+        mission_types=sorted(set(KNOWN_MISSION_TYPES) | live_missions),
+        planets=sorted(set(KNOWN_PLANETS) | live_planets),
+        nodes=sorted(live_nodes),
     )
 
 
@@ -96,6 +111,7 @@ async def list_subscriptions(repo: RepoDep) -> FissureSubscriptionsResponse:
 async def add_subscription(req: FissureSubscriptionCreate, repo: RepoDep) -> FissureSubscriptionsResponse:
     await repo.add_fissure_subscription(
         era=req.era or None, mission_type=req.mission_type or None,
+        planet=req.planet or None, node=req.node or None,
         is_hard=req.is_hard, is_storm=req.is_storm, ts=int(time.time()),
     )
     rows = await repo.list_fissure_subscriptions()

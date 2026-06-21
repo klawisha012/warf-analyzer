@@ -67,3 +67,23 @@ async def test_subscription_crud(client: httpx.AsyncClient) -> None:
 
     r = await client.delete(f"/fissures/subscriptions/{sub_id}")
     assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_meta_includes_planets_and_nodes(client: httpx.AsyncClient) -> None:
+    r = await client.get("/fissures/meta")
+    assert r.status_code == 200
+    body = r.json()
+    assert "Eris" in body["planets"]       # live planet from the fake client
+    assert "Neptune" in body["planets"]     # static known planet
+    assert "X (Eris)" in body["nodes"]      # live node from the fake client
+
+
+@pytest.mark.asyncio
+async def test_subscription_with_planet_and_node(client: httpx.AsyncClient) -> None:
+    r = await client.post("/fissures/subscriptions",
+                          json={"planet": "Neptune", "node": "Proteus"})
+    assert r.status_code == 201
+    item = r.json()["items"][0]
+    assert item["planet"] == "Neptune"
+    assert item["node"] == "Proteus"

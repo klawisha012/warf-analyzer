@@ -391,12 +391,16 @@ class FissuresResponse(BaseModel):
 class FissureMetaResponse(BaseModel):
     eras: list[str]
     mission_types: list[str]
+    planets: list[str]
+    nodes: list[str]
 
 
 class FissureSubscriptionRow(BaseModel):
     id: int
     era: str | None = None
     mission_type: str | None = None
+    planet: str | None = None
+    node: str | None = None
     is_hard: bool | None = None
     is_storm: bool | None = None
     enabled: bool = True
@@ -411,6 +415,8 @@ class FissureSubscriptionsResponse(BaseModel):
 class FissureSubscriptionCreate(BaseModel):
     era: str | None = None
     mission_type: str | None = None
+    planet: str | None = None
+    node: str | None = None
     is_hard: bool | None = None
     is_storm: bool | None = None
 
