@@ -83,6 +83,19 @@ export type PricedItemListResponse = {
   items: PricedItem[];
 };
 
+export type ItemBaseStats = {
+  unique_name: string;
+  category: string | null;
+  name: string | null;
+  mastery_req: number | null;
+  disposition: number | null;
+  stats: Record<string, unknown>;
+  source: string | null;
+  updated_at: number | null;
+};
+
+export type ItemBaseStatsListResponse = { total: number; items: ItemBaseStats[] };
+
 export type RefreshResponse = {
   ok: boolean;
   files: Record<string, unknown>;

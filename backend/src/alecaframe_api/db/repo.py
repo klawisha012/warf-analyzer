@@ -183,6 +183,75 @@ class Repo:
             grouped.setdefault(set_slug, {})[part_slug] = qty
         return [{"set_slug": s, "parts": p} for s, p in grouped.items()]
 
+    # ----------------------------------------------------------- base stats
+
+    async def upsert_base_stats(self, rows: list[dict[str, Any]]) -> int:
+        """Bulk upsert reference base stats keyed by unique_name. Each row:
+        {unique_name, category, name, mastery_req, disposition, stats(dict), source}.
+        Returns the number of rows written."""
+        if not rows:
+            return 0
+        import time
+        now = int(time.time())
+        conn = self._require_conn()
+        await conn.executemany(
+            """INSERT INTO item_base_stats
+                 (unique_name, category, name, mastery_req, disposition, stats_json, source, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(unique_name) DO UPDATE SET
+                 category=excluded.category, name=excluded.name,
+                 mastery_req=excluded.mastery_req, disposition=excluded.disposition,
+                 stats_json=excluded.stats_json, source=excluded.source,
+                 updated_at=excluded.updated_at""",
+            [
+                (r["unique_name"], r.get("category"), r.get("name"),
+                 r.get("mastery_req"), r.get("disposition"),
+                 json.dumps(r.get("stats") or {}, ensure_ascii=False),
+                 r.get("source") or "wfcd", now)
+                for r in rows
+            ],
+        )
+        await conn.commit()
+        return len(rows)
+
+    async def count_base_stats(self) -> int:
+        conn = self._require_conn()
+        async with conn.execute("SELECT COUNT(*) FROM item_base_stats") as cur:
+            row = await cur.fetchone()
+        return int(row[0]) if row else 0
+
+    @staticmethod
+    def _base_stats_row(d: dict[str, Any]) -> dict[str, Any]:
+        try:
+            d["stats"] = json.loads(d.pop("stats_json") or "{}")
+        except Exception:
+            d["stats"] = {}
+        return d
+
+    async def get_base_stats(self, unique_name: str) -> dict[str, Any] | None:
+        conn = self._require_conn()
+        async with conn.execute(
+            "SELECT * FROM item_base_stats WHERE unique_name = ?", (unique_name,),
+        ) as cursor:
+            cols = [c[0] for c in cursor.description]
+            row = await cursor.fetchone()
+        return self._base_stats_row(dict(zip(cols, row))) if row else None
+
+    async def list_base_stats(
+        self, *, category: str | None = None, limit: int = 2000,
+    ) -> list[dict[str, Any]]:
+        conn = self._require_conn()
+        if category:
+            sql = "SELECT * FROM item_base_stats WHERE category = ? ORDER BY name LIMIT ?"
+            args: tuple[Any, ...] = (category, limit)
+        else:
+            sql = "SELECT * FROM item_base_stats ORDER BY name LIMIT ?"
+            args = (limit,)
+        async with conn.execute(sql, args) as cursor:
+            cols = [c[0] for c in cursor.description]
+            rows = await cursor.fetchall()
+        return [self._base_stats_row(dict(zip(cols, r))) for r in rows]
+
     # ----------------------------------------------------------- live events
 
     async def append_live_event(

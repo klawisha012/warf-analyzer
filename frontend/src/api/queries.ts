@@ -16,6 +16,8 @@ import type {
   RivenWatchlistResponse,
   RivenWeaponsResponse,
   SetProfitResponse,
+  ItemBaseStats,
+  ItemBaseStatsListResponse,
   WFMItemsResponse,
   WtbMatchResponse,
 } from "./types";
@@ -39,6 +41,8 @@ export const keys = {
   rivenWatchlist: () => ["rivens", "watchlist"] as const,
   rivenHistory:   (slug: string, tier: string, days: number) => ["rivens", "history", slug, tier, days] as const,
   rivenWeapons:   () => ["rivens", "weapons"] as const,
+  refItem:        (uniqueName: string) => ["reference", "item", uniqueName] as const,
+  refItems:       (category: string | null) => ["reference", "items", category] as const,
   fissuresLive:  () => ["fissures", "live"] as const,
   fissuresMeta:  () => ["fissures", "meta"] as const,
   fissuresSubs:  () => ["fissures", "subs"] as const,
@@ -65,6 +69,10 @@ export const fetchers = {
   meWtbMatches: (min_offer: number) =>
     api<WtbMatchResponse>(`/me/wtb-matches?min_offer=${min_offer}`),
   meRelistNudges: () => api<RelistNudgeResponse>("/me/relist-nudges"),
+  refItem: (uniqueName: string) =>
+    api<ItemBaseStats>(`/reference/item?unique_name=${encodeURIComponent(uniqueName)}`),
+  refItems: (category: string | null) =>
+    api<ItemBaseStatsListResponse>(`/reference/items${category ? `?category=${encodeURIComponent(category)}` : ""}`),
   refresh: () => api<RefreshResponse>("/refresh", { method: "POST" }),
   prices: (slugs: string[]) =>
     api<PricesSnapshotResponse>(`/prices?slugs=${encodeURIComponent(slugs.join(","))}`),

@@ -172,6 +172,23 @@ class PricedItemListResponse(BaseModel):
     items: list[PricedItemEntry]
 
 
+class ItemBaseStats(BaseModel):
+    """Base (unmodded) reference stats for one item/warframe, from WFCD."""
+    unique_name: str
+    category: str | None = None
+    name: str | None = None
+    mastery_req: int | None = None
+    disposition: float | None = None
+    stats: dict[str, Any] = Field(default_factory=dict)
+    source: str | None = None
+    updated_at: int | None = None
+
+
+class ItemBaseStatsListResponse(BaseModel):
+    total: int
+    items: list[ItemBaseStats]
+
+
 class SetProfitRowModel(BaseModel):
     set_slug: str
     set_name: str

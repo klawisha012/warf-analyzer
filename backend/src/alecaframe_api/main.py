@@ -42,6 +42,8 @@ from .wfm.price_store import PriceStore
 from .wfm.sets import SetComposition, SetIndex
 from .wfm.slugs import SlugResolver
 from .db.repo import Repo
+from .reference import stats_loader
+from .reference.router import router as reference_router
 from .wfm.history_router import router as history_router
 from .wfm.recipe_uses import RecipeUse, load_recipe_uses
 from .wfm.sets_loader import load_set_compositions_from_aleca
@@ -186,6 +188,24 @@ async def lifespan(app: FastAPI):
             ))
         log.info("loaded %d set compositions from DB", len(existing))
 
+    # ----- Base-stats reference (WFCD) -----
+    # Populate on first boot if empty, then refresh weekly. Background + best
+    # effort: WFM/inventory features never wait on it.
+    async def _base_stats_loop() -> None:
+        try:
+            if await repo.count_base_stats() == 0:
+                await stats_loader.refresh(repo)
+        except Exception as e:
+            log.warning("initial base-stats load failed: %s", e)
+        while True:
+            await asyncio.sleep(7 * 24 * 3600)
+            try:
+                await stats_loader.refresh(repo)
+            except Exception as e:
+                log.warning("weekly base-stats refresh failed: %s", e)
+
+    base_stats_task = asyncio.create_task(_base_stats_loop())
+
     # Expose singletons to wfm/dependencies.
     wfm_deps.wfm_client = wfm_client
     wfm_deps.slug_resolver = slug_resolver
@@ -293,9 +313,10 @@ async def lifespan(app: FastAPI):
     price_poller_task.cancel()
     auction_poller_task.cancel()
     fissure_poller_task.cancel()
+    base_stats_task.cancel()
     if telegram_bot_task is not None:
         telegram_bot_task.cancel()
-    for task in (price_poller_task, auction_poller_task, fissure_poller_task, telegram_bot_task):
+    for task in (price_poller_task, auction_poller_task, fissure_poller_task, telegram_bot_task, base_stats_task):
         if task is None:
             continue
         try:
@@ -328,6 +349,7 @@ app.include_router(me_router)
 app.include_router(history_router)
 app.include_router(rivens_router)
 app.include_router(fissures_router)
+app.include_router(reference_router)
 
 # ---------------------------------------------------------- helpers / deps
 
