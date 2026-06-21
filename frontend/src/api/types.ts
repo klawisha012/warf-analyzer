@@ -291,6 +291,7 @@ export type FissureMetaResponse = {
   mission_types: string[];
   planets: string[];
   nodes: string[];
+  nodes_by_planet: Record<string, string[]>;
 };
 
 export type FissureSubscriptionRow = {

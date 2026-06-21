@@ -52,6 +52,14 @@ export default function Fissures() {
   const [hard, setHard] = createSignal("");
   const [storm, setStorm] = createSignal("");
 
+  // Node suggestions: the chosen planet's full star-chart list (so you can pick
+  // a node that has no live fissure yet); with no planet, the currently-live nodes.
+  const nodeOptions = () => {
+    const p = planet();
+    const byPlanet = meta.data?.nodes_by_planet ?? {};
+    return p && byPlanet[p]?.length ? byPlanet[p] : (meta.data?.nodes ?? []);
+  };
+
   async function addSub() {
     await fetchers.fissuresSubAdd({
       era: era() || null,
@@ -110,7 +118,7 @@ export default function Fissures() {
                 class="field"
               />
               <datalist id="fissure-nodes">
-                <For each={meta.data?.nodes ?? []}>{(x) => <option value={x} />}</For>
+                <For each={nodeOptions()}>{(x) => <option value={x} />}</For>
               </datalist>
 
               <label class="block text-xs text-sub">{t("fissures.steelPath")}</label>
