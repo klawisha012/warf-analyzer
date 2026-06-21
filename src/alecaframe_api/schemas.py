@@ -340,3 +340,63 @@ class RivenHistoryResponse(BaseModel):
     weapon_slug: str
     tier: str
     items: list[RivenSnapshotRow]
+
+
+# ----- void fissures -------------------------------------------------------
+
+
+class FissureRow(BaseModel):
+    id: str
+    era: str
+    mission_type: str
+    node: str
+    planet: str | None = None
+    enemy: str | None = None
+    is_hard: bool
+    is_storm: bool
+    expiry: str | None = None
+    eta_seconds: int | None = None
+
+
+class FissuresResponse(BaseModel):
+    total: int
+    items: list[FissureRow]
+
+
+class FissureMetaResponse(BaseModel):
+    eras: list[str]
+    mission_types: list[str]
+
+
+class FissureSubscriptionRow(BaseModel):
+    id: int
+    era: str | None = None
+    mission_type: str | None = None
+    is_hard: bool | None = None
+    is_storm: bool | None = None
+    enabled: bool = True
+    created_at: int
+
+
+class FissureSubscriptionsResponse(BaseModel):
+    total: int
+    items: list[FissureSubscriptionRow]
+
+
+class FissureSubscriptionCreate(BaseModel):
+    era: str | None = None
+    mission_type: str | None = None
+    is_hard: bool | None = None
+    is_storm: bool | None = None
+
+
+class TelegramChatRow(BaseModel):
+    chat_id: int
+    username: str | None = None
+    registered_at: int
+
+
+class TelegramChatsResponse(BaseModel):
+    bot_enabled: bool
+    total: int
+    items: list[TelegramChatRow]
