@@ -68,3 +68,21 @@ async def test_no_subscriptions_is_noop(repo: Repo) -> None:
 def test_format_message_includes_axes() -> None:
     msg = format_message(_f("a1", "Axi", mt="Survival", hard=True))
     assert "Axi" in msg and "Survival" in msg
+
+
+@pytest.mark.asyncio
+async def test_node_filtered_subscription_only_fires_for_match(repo: Repo) -> None:
+    await repo.add_fissure_subscription(
+        era=None, mission_type=None, planet=None, node="Proteus",
+        is_hard=None, is_storm=None, ts=1,
+    )
+    await repo.register_telegram_chat(chat_id=42, username=None, ts=1)
+    f_match = Fissure(id="m1", era="Axi", mission_type="Survival",
+                      node="Proteus (Neptune)", planet="Neptune", enemy=None,
+                      is_hard=False, is_storm=False, activation=None, expiry=None)
+    f_other = _f("o1", "Axi")  # node "X (Eris)"
+    tg = _FakeTelegram()
+    poller = FissurePoller(repo=repo, client=_FakeClient([f_match, f_other]), telegram=tg)
+
+    await poller.tick(now=1000)
+    assert len(tg.sent) == 1  # only the Proteus node matched

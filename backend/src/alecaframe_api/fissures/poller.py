@@ -45,6 +45,7 @@ def _row_to_sub(r: dict) -> Subscription:
         return None if v is None else bool(v)
     return Subscription(
         id=int(r["id"]), era=r["era"], mission_type=r["mission_type"],
+        planet=r["planet"], node=r["node"],
         is_hard=_b(r["is_hard"]), is_storm=_b(r["is_storm"]),
         enabled=bool(r["enabled"]), created_at=int(r["created_at"]),
     )
