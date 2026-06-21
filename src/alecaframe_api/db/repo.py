@@ -356,3 +356,89 @@ class Repo:
                 d["attributes"] = []
             out.append(d)
         return out
+
+    # ----------------------------------------------------------- fissures
+
+    async def add_fissure_subscription(
+        self, *, era: str | None, mission_type: str | None,
+        is_hard: bool | None, is_storm: bool | None, ts: int,
+    ) -> int:
+        conn = self._require_conn()
+        cur = await conn.execute(
+            """INSERT INTO fissure_subscription
+               (era, mission_type, is_hard, is_storm, enabled, created_at)
+               VALUES (?, ?, ?, ?, 1, ?)""",
+            (era, mission_type,
+             None if is_hard is None else int(is_hard),
+             None if is_storm is None else int(is_storm),
+             ts),
+        )
+        await conn.commit()
+        return int(cur.lastrowid)
+
+    async def list_fissure_subscriptions(
+        self, *, enabled_only: bool = False,
+    ) -> list[dict[str, Any]]:
+        conn = self._require_conn()
+        sql = ("SELECT id, era, mission_type, is_hard, is_storm, enabled, created_at "
+               "FROM fissure_subscription")
+        if enabled_only:
+            sql += " WHERE enabled = 1"
+        sql += " ORDER BY created_at DESC"
+        async with conn.execute(sql) as cursor:
+            cols = [c[0] for c in cursor.description]
+            rows = await cursor.fetchall()
+        return [dict(zip(cols, r)) for r in rows]
+
+    async def remove_fissure_subscription(self, sub_id: int) -> bool:
+        conn = self._require_conn()
+        cur = await conn.execute(
+            "DELETE FROM fissure_subscription WHERE id = ?", (sub_id,),
+        )
+        await conn.commit()
+        return (cur.rowcount or 0) > 0
+
+    async def register_telegram_chat(
+        self, *, chat_id: int, username: str | None, ts: int,
+    ) -> None:
+        conn = self._require_conn()
+        await conn.execute(
+            """INSERT INTO telegram_chat (chat_id, username, registered_at)
+               VALUES (?, ?, ?)
+               ON CONFLICT(chat_id) DO UPDATE SET username = excluded.username""",
+            (chat_id, username, ts),
+        )
+        await conn.commit()
+
+    async def list_telegram_chats(self) -> list[dict[str, Any]]:
+        conn = self._require_conn()
+        async with conn.execute(
+            "SELECT chat_id, username, registered_at FROM telegram_chat "
+            "ORDER BY registered_at ASC"
+        ) as cursor:
+            cols = [c[0] for c in cursor.description]
+            rows = await cursor.fetchall()
+        return [dict(zip(cols, r)) for r in rows]
+
+    async def record_fissure_notification(
+        self, *, subscription_id: int, fissure_id: str, ts: int,
+    ) -> bool:
+        """INSERT OR IGNORE into the dedup ledger. Returns True if newly
+        inserted (first time we've seen this sub×fissure pair), False if it
+        was already there."""
+        conn = self._require_conn()
+        cur = await conn.execute(
+            """INSERT OR IGNORE INTO fissure_notification
+               (subscription_id, fissure_id, notified_at) VALUES (?, ?, ?)""",
+            (subscription_id, fissure_id, ts),
+        )
+        await conn.commit()
+        return (cur.rowcount or 0) > 0
+
+    async def prune_fissure_notifications(self, *, older_than: int) -> int:
+        conn = self._require_conn()
+        cur = await conn.execute(
+            "DELETE FROM fissure_notification WHERE notified_at < ?", (older_than,),
+        )
+        await conn.commit()
+        return cur.rowcount or 0

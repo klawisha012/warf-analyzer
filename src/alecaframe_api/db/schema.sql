@@ -96,3 +96,29 @@ CREATE TABLE IF NOT EXISTS riven_auction (
 );
 CREATE INDEX IF NOT EXISTS idx_riven_auction_weapon ON riven_auction(weapon_slug, status);
 CREATE INDEX IF NOT EXISTS idx_riven_auction_last_seen ON riven_auction(last_seen DESC);
+
+-- Void Fissure subscriptions + Telegram chats + notification dedup ledger.
+
+CREATE TABLE IF NOT EXISTS fissure_subscription (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  era          TEXT,            -- NULL = any
+  mission_type TEXT,            -- NULL = any
+  is_hard      INTEGER,         -- 0 | 1 | NULL(any)
+  is_storm     INTEGER,         -- 0 | 1 | NULL(any)
+  enabled      INTEGER NOT NULL DEFAULT 1,
+  created_at   INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS telegram_chat (
+  chat_id       INTEGER PRIMARY KEY,
+  username      TEXT,
+  registered_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS fissure_notification (
+  subscription_id INTEGER NOT NULL,
+  fissure_id      TEXT NOT NULL,
+  notified_at     INTEGER NOT NULL,
+  PRIMARY KEY (subscription_id, fissure_id)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idx_fissure_notif_at ON fissure_notification(notified_at);
