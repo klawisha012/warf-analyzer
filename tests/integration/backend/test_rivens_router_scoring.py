@@ -59,6 +59,18 @@ def test_to_row_attaches_grade_and_score() -> None:
     assert row.grade is not None and row.score is not None
 
 
+def test_to_row_sets_market_signal_steal() -> None:
+    profiles = build_profiles({"name": "Dread", "category": "primary",
+                               "stats": {"crit_chance": 0.5, "status_chance": 0.1}})
+    auction = {"id": "a1", "buyout_price": 80, "item": {"weapon_url_name": "dread",
+        "attributes": [
+            {"url_name": "critical_chance", "value": 150, "positive": True},
+            {"url_name": "critical_damage", "value": 90, "positive": True}]}}
+    row = _to_row(auction, "low", profiles=profiles, market_median=120)
+    assert row.grade in {"S", "A"}              # strong roll
+    assert row.market_signal == "steal"         # priced under the 120 median
+
+
 def test_to_row_passes_through_unscored_reason() -> None:
     row = _to_row(_auction(), "god", profiles=None,
                   weapon_unscored_reason="melee_out_of_scope_m1")

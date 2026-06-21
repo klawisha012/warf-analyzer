@@ -35,7 +35,8 @@ from alecaframe_api.wfm.rivens_analysis import (
     suggest_strategies, summarize_attributes,
 )
 from alecaframe_api.wfm.riven_scoring import (
-    Profile, build_profiles, is_scoreable_category, resolve_weapon, score_riven,
+    Profile, build_profiles, classify_market_signal, is_scoreable_category,
+    resolve_weapon, score_riven,
 )
 
 log = logging.getLogger("alecaframe.wfm.rivens_router")
@@ -62,6 +63,7 @@ def _to_row(
     a: dict, tier: str, *,
     profiles: list[Profile] | None = None,
     weapon_unscored_reason: str | None = None,
+    market_median: int | None = None,
 ) -> RivenAuctionRow:
     item = a.get("item") or {}
     owner = a.get("owner") or {}
@@ -85,10 +87,13 @@ def _to_row(
     elif weapon_unscored_reason:
         unscored, reason = True, weapon_unscored_reason
 
+    buyout = _safe_int(a.get("buyout_price"))
+    market_signal = classify_market_signal(grade, buyout, market_median)
+
     return RivenAuctionRow(
         auction_id=str(a.get("id") or ""),
         weapon_slug=item.get("weapon_url_name") or "",
-        buyout_price=_safe_int(a.get("buyout_price")),
+        buyout_price=buyout,
         starting_price=_safe_int(a.get("starting_price")),
         top_bid=_safe_int(a.get("top_bid")),
         re_rolls=_safe_int(item.get("re_rolls")),
@@ -102,6 +107,7 @@ def _to_row(
         score=score,
         unscored=unscored,
         unscored_reason=reason,
+        market_signal=market_signal,
     )
 
 
@@ -175,9 +181,13 @@ async def riven_auctions(
     profiles, weapon_unscored_reason = await _resolve_weapon_profiles(weapon_slug, client, repo)
 
     tiers_raw = classify_tiers(auctions)
+    # Overall median is the fair-price reference for the steal/trap signal (S4).
+    s_all = compute_tier_stats(auctions)
     tiers_rows: dict[str, list[RivenAuctionRow]] = {
         name: [
-            _to_row(a, name, profiles=profiles, weapon_unscored_reason=weapon_unscored_reason)
+            _to_row(a, name, profiles=profiles,
+                    weapon_unscored_reason=weapon_unscored_reason,
+                    market_median=s_all.median)
             for a in tiers_raw[name]
         ]
         for name in ("god", "mid", "low")
@@ -191,7 +201,6 @@ async def riven_auctions(
             tier=name, count=s.count, min_price=s.min_price,
             p25=s.p25, median=s.median, p75=s.p75, max_price=s.max_price,
         ))
-    s_all = compute_tier_stats(auctions)
     stats_models.append(RivenTierStats(
         tier="all", count=s_all.count, min_price=s_all.min_price,
         p25=s_all.p25, median=s_all.median, p75=s_all.p75, max_price=s_all.max_price,

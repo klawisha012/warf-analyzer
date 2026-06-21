@@ -294,6 +294,9 @@ class RivenAuctionRow(BaseModel):
     score: int | None = None
     unscored: bool = False
     unscored_reason: str | None = None
+    # Quality grade crossed with market price: "steal" (S/A under median),
+    # "trap" (F over median), or null (fair / unscored). Added in S4.
+    market_signal: str | None = None
 
 
 class RivenTierStats(BaseModel):
