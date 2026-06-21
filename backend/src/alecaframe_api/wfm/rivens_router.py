@@ -116,20 +116,28 @@ async def _resolve_weapon_profiles(
     try:
         weapons = await client.get_riven_weapons()
     except WFMAuctionError:
-        return [], "no_base_profile"
+        # An outage is not "we have no data for this weapon" — keep it distinct
+        # so the UI doesn't imply the weapon is unsupported.
+        return [], "weapon_fetch_failed"
     item_name = next(
         (w.get("item_name") for w in weapons if w.get("url_name") == weapon_slug), None,
     )
     if not item_name:
+        log.info("riven scoring: slug %r not in riven-weapons catalogue", weapon_slug)
         return [], "no_base_profile"
     base_row = resolve_weapon(item_name, await repo.weapon_base_stats_index())
     if base_row is None:
+        # Log the name-join miss so WEAPON_NAME_OVERRIDES can grow on real gaps.
+        log.info("riven scoring: no base-stats row for %r (slug %r)", item_name, weapon_slug)
         return [], "no_base_profile"
     category = base_row.get("category")
     if not is_scoreable_category(category):
         reason = "melee_out_of_scope_m1" if category in ("melee", "arch_melee") else "category_out_of_scope_m1"
         return [], reason
-    return build_profiles(base_row), None
+    profiles = build_profiles(base_row)
+    if not profiles:
+        return [], "incomplete_base_stats"
+    return profiles, None
 
 
 def _safe_int(v) -> int | None:

@@ -56,9 +56,16 @@ def statusness(stats: dict) -> float:
 _CRIT_STATS = {"critical_chance", "critical_damage", "critical_chance_on_slide"}
 _STATUS_STATS = {"status_chance"}
 # Universal: strong on virtually every weapon → archetype-independent weight.
+# Defensive UNION of known spellings: WFM's v2 attribute slugs use the suffixed
+# forms (base_damage_/_melee_damage, toxin_damage, electric_damage,
+# damage_vs_<faction>), while older code/auctions may use bare forms. Matching
+# either is correct; an unused key is harmless. The authoritative fail-closed
+# vocab (snapshot of /riven/attributes + coverage test) lands in S2 (#3).
 _UNIVERSAL_STATS = {
-    "damage", "multishot", "fire_rate",
-    "toxin", "cold", "heat", "electricity",
+    "damage", "base_damage_/_melee_damage",
+    "multishot", "fire_rate", "fire_rate_/_attack_speed",
+    "toxin", "toxin_damage", "cold", "cold_damage",
+    "heat", "heat_damage", "electricity", "electric_damage",
     "damage_vs_grineer", "damage_vs_corpus", "damage_vs_infested",
 }
 
@@ -127,8 +134,16 @@ def is_scoreable_category(category: str | None) -> bool:
 
 def build_profiles(weapon_row: dict) -> list[Profile]:
     """Compute a weapon's combat profiles. M1 ships the base form only;
-    Incarnon/perk profiles are added in S3 behind the same interface."""
+    Incarnon/perk profiles are added in S3 behind the same interface.
+
+    Returns [] when the row has no usable base stats (a WFCD data gap) so the
+    caller renders it as `unscored` rather than emitting a confident grade off
+    of all-zero stats. `omega_attenuation` is plumbed here but consumed in S2's
+    roll-value grading, not in S1's presence-based score.
+    """
     stats = weapon_row.get("stats") or {}
+    if not stats:
+        return []
     return [Profile(
         kind="base",
         critness=critness(stats),
@@ -151,9 +166,13 @@ def _score_one(attrs: list[dict], profile: Profile) -> ProfileScore:
     # S1 is presence-based: roll *values* (grade_roll_value) arrive in S2.
     raw = sum(stat_weight(a.get("name", ""), profile) for a in positives)
     raw -= sum(stat_weight(a.get("name", ""), profile) for a in negatives)
-    # Normalize against the ideal roll: every positive at the max archetype weight.
+    # Normalize against the ideal roll = every positive at the best weight
+    # ACHIEVABLE on THIS profile, not a global archetype max. Otherwise a
+    # raw-damage weapon (critness=statusness=0, so archetype stats weigh 0)
+    # could never exceed B on its best possible universal roll.
     n_pos = max(1, len(positives))
-    ideal = n_pos * _W_ARCHETYPE
+    profile_max = max(_W_UNIVERSAL, _W_ARCHETYPE * max(profile.critness, profile.statusness))
+    ideal = n_pos * profile_max
     score = int(round(100 * max(0.0, raw) / ideal))
     score = 0 if score < 0 else 100 if score > 100 else score
     return ProfileScore(kind=profile.kind, score=score, grade=_grade(score))

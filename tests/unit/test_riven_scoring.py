@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from alecaframe_api.wfm.riven_scoring import (
     Profile,
+    _grade,
     build_profiles,
     critness,
     is_scoreable_category,
@@ -164,3 +165,56 @@ def test_is_scoreable_category_guns_only_in_m1() -> None:
     assert is_scoreable_category("melee") is False        # M1 = guns only (A6)
     assert is_scoreable_category("arch_melee") is False
     assert is_scoreable_category(None) is False
+
+
+def test_grade_cutoff_boundaries() -> None:
+    assert _grade(85) == "S" and _grade(84) == "A"
+    assert _grade(70) == "A" and _grade(69) == "B"
+    assert _grade(50) == "B" and _grade(49) == "C"
+    assert _grade(30) == "C" and _grade(29) == "F"
+    assert _grade(0) == "F"
+
+
+def test_raw_damage_weapon_can_reach_top_grade() -> None:
+    # Regression: a pure raw-damage weapon (critness=statusness=0) must be able
+    # to score S on its best universal roll — the old fixed archetype divisor
+    # capped the whole class at B.
+    raw = build_profiles(_weapon_row("Some Launcher", crit_chance=0.0, status_chance=0.0))
+    res = score_riven([_pos("damage"), _pos("multishot")], raw)
+    assert res.headline.grade in {"S", "A"}
+
+
+def test_multishot_scores_lower_on_launcher_than_rifle() -> None:
+    rifle = build_profiles(_weapon_row("Rifle", crit_chance=0.0, status_chance=0.0, type="Rifle"))
+    launcher = build_profiles(_weapon_row("Launcher", crit_chance=0.0, status_chance=0.0, type="Launcher"))
+    riven = [_pos("multishot")]
+    assert score_riven(riven, launcher).headline.score < score_riven(riven, rifle).headline.score
+
+
+def test_all_negative_roll_floors_at_f() -> None:
+    crit = build_profiles(_weapon_row("Dread", crit_chance=0.5))
+    res = score_riven([_neg("critical_chance")], crit)
+    assert res.unscored is False and res.headline.score == 0 and res.headline.grade == "F"
+
+
+def test_empty_attrs_scores_zero() -> None:
+    crit = build_profiles(_weapon_row("Dread", crit_chance=0.5))
+    assert score_riven([], crit).headline.score == 0
+
+
+def test_stat_name_normalization_variants() -> None:
+    crit = _profile(critness=1.0, statusness=0.0)
+    assert stat_weight("Critical Chance", crit) == stat_weight("critical_chance", crit)
+    assert stat_weight("critical-chance", crit) == stat_weight("critical_chance", crit)
+
+
+def test_faction_and_element_and_base_damage_have_weight() -> None:
+    p = _profile(critness=0.0, statusness=0.0)
+    assert stat_weight("damage_vs_grineer", p) > 0      # v2-confirmed faction slug
+    assert stat_weight("heat_damage", p) > 0            # suffixed element slug
+    assert stat_weight("base_damage_/_melee_damage", p) > 0
+    assert stat_weight("damage", p) > 0                 # bare form also matches
+
+
+def test_build_profiles_empty_stats_returns_empty() -> None:
+    assert build_profiles({"name": "X", "category": "primary", "stats": {}}) == []
