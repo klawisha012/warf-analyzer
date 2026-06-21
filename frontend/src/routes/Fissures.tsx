@@ -47,6 +47,8 @@ export default function Fissures() {
 
   const [era, setEra] = createSignal("");
   const [mission, setMission] = createSignal("");
+  const [planet, setPlanet] = createSignal("");
+  const [node, setNode] = createSignal("");
   const [hard, setHard] = createSignal("");
   const [storm, setStorm] = createSignal("");
 
@@ -54,10 +56,12 @@ export default function Fissures() {
     await fetchers.fissuresSubAdd({
       era: era() || null,
       mission_type: mission() || null,
+      planet: planet() || null,
+      node: node().trim() || null,
       is_hard: triToBool(hard()),
       is_storm: triToBool(storm()),
     });
-    setEra(""); setMission(""); setHard(""); setStorm("");
+    setEra(""); setMission(""); setPlanet(""); setNode(""); setHard(""); setStorm("");
     await qc.invalidateQueries({ queryKey: keys.fissuresSubs() });
   }
 
@@ -91,6 +95,24 @@ export default function Fissures() {
                 <For each={meta.data?.mission_types ?? []}>{(x) => <option value={x}>{x}</option>}</For>
               </select>
 
+              <label class="block text-xs text-sub">{t("fissures.planet")}</label>
+              <select value={planet()} onChange={(e) => setPlanet(e.currentTarget.value)} class="field">
+                <option value="">{t("fissures.any")}</option>
+                <For each={meta.data?.planets ?? []}>{(x) => <option value={x}>{x}</option>}</For>
+              </select>
+
+              <label class="block text-xs text-sub">{t("fissures.node")}</label>
+              <input
+                value={node()}
+                onInput={(e) => setNode(e.currentTarget.value)}
+                list="fissure-nodes"
+                placeholder={t("fissures.nodePlaceholder")}
+                class="field"
+              />
+              <datalist id="fissure-nodes">
+                <For each={meta.data?.nodes ?? []}>{(x) => <option value={x} />}</For>
+              </datalist>
+
               <label class="block text-xs text-sub">{t("fissures.steelPath")}</label>
               <select value={hard()} onChange={(e) => setHard(e.currentTarget.value)} class="field">
                 <option value="">{t("fissures.any")}</option>
@@ -122,6 +144,8 @@ export default function Fissures() {
                         <span class="flex flex-wrap gap-1.5 items-center">
                           <Badge variant="info">{s.era ?? t("fissures.any")}</Badge>
                           <Badge>{s.mission_type ?? t("fissures.any")}</Badge>
+                          <Show when={s.planet}><Badge variant="info">{s.planet}</Badge></Show>
+                          <Show when={s.node}><Badge>{s.node}</Badge></Show>
                           <Show when={s.is_hard === true}><Badge variant="warn">SP</Badge></Show>
                           <Show when={s.is_storm === true}><Badge variant="vaulted">Storm</Badge></Show>
                         </span>

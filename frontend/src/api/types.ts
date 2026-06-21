@@ -286,12 +286,19 @@ export type FissureRow = {
 
 export type FissuresResponse = { total: number; items: FissureRow[] };
 
-export type FissureMetaResponse = { eras: string[]; mission_types: string[] };
+export type FissureMetaResponse = {
+  eras: string[];
+  mission_types: string[];
+  planets: string[];
+  nodes: string[];
+};
 
 export type FissureSubscriptionRow = {
   id: number;
   era: string | null;
   mission_type: string | null;
+  planet: string | null;
+  node: string | null;
   is_hard: boolean | null;
   is_storm: boolean | null;
   enabled: boolean;
@@ -303,6 +310,8 @@ export type FissureSubscriptionsResponse = { total: number; items: FissureSubscr
 export type FissureSubscriptionCreate = {
   era: string | null;
   mission_type: string | null;
+  planet: string | null;
+  node: string | null;
   is_hard: boolean | null;
   is_storm: boolean | null;
 };
