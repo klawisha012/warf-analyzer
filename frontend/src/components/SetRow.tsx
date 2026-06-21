@@ -2,9 +2,12 @@ import { For, Show } from "solid-js";
 import type { SetProfitRow } from "../api/types";
 import { fmtPlat, prettySlug, wfmUrl } from "../lib/format";
 import Badge from "./Badge";
+import ItemThumb from "./ItemThumb";
+import { useItemThumbs } from "../lib/itemImages";
 import { t } from "../i18n";
 
 export default function SetRowComp(props: { row: SetProfitRow }) {
+  const thumbOf = useItemThumbs();
   const profitVariant = () =>
     props.row.profit >= 30 ? "good" : props.row.profit >= 10 ? "info" : "neutral";
   const missing = () => Object.entries(props.row.missing_parts ?? {});
@@ -28,8 +31,9 @@ export default function SetRowComp(props: { row: SetProfitRow }) {
   return (
     <article class="surface p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-line-strong flex flex-col justify-between">
       <div>
-        <header class="flex items-start justify-between gap-3 mb-3">
-          <div class="min-w-0">
+        <header class="flex items-start gap-3 mb-3">
+          <ItemThumb src={thumbOf(props.row.set_slug)} name={props.row.set_name} size={44} />
+          <div class="min-w-0 flex-1">
             <a
               href={wfmUrl(props.row.set_slug)}
               target="_blank"

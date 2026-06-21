@@ -4,6 +4,8 @@ import Card from "../components/Card";
 import Badge from "../components/Badge";
 import EmptyState from "../components/EmptyState";
 import PageHeader from "../components/PageHeader";
+import ItemThumb from "../components/ItemThumb";
+import { wfmAsset } from "../lib/itemImages";
 import { fetchers, keys } from "../api/queries";
 import { fmtPlat, prettySlug } from "../lib/format";
 import { useRivenAlerts } from "../hooks/useRivenAlerts";
@@ -186,13 +188,14 @@ function WatchlistPanel(p: {
                   <button
                     type="button"
                     onClick={() => p.onSelect(slug)}
-                    class="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-[10px] text-left text-sm transition-colors"
+                    class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[10px] text-left text-sm transition-colors"
                     classList={{
                       "bg-brand/10 text-fg": p.selected === slug,
                       "text-sub hover:bg-white/[0.03]": p.selected !== slug,
                     }}
                   >
-                    <span class="truncate">{meta?.item_name ?? prettySlug(slug)}</span>
+                    <ItemThumb src={wfmAsset(meta?.icon)} name={meta?.item_name ?? slug} size={30} />
+                    <span class="truncate flex-1">{meta?.item_name ?? prettySlug(slug)}</span>
                     <span class="flex items-center gap-1">
                       <Show when={(counts()[slug] ?? 0) > 0}>
                         <Badge variant="good">{counts()[slug]}</Badge>
@@ -270,7 +273,8 @@ function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
 
   return (
     <div class="space-y-4">
-      <header class="flex items-baseline gap-3 flex-wrap">
+      <header class="flex items-center gap-3 flex-wrap">
+        <ItemThumb src={wfmAsset(p.weapon?.icon)} name={p.weapon?.item_name ?? prettySlug(p.slug)} size={40} />
         <h2 class="text-xl font-semibold text-fg font-display tracking-tight">{p.weapon?.item_name ?? prettySlug(p.slug)}</h2>
         <Show when={p.weapon?.disposition != null}>
           <span class="text-xs px-2 py-0.5 rounded bg-surface2 border border-line text-amber-300 num">

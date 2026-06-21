@@ -1,16 +1,20 @@
 import { Show } from "solid-js";
 import type { PricedItem } from "../api/types";
 import Badge from "./Badge";
+import ItemThumb from "./ItemThumb";
+import { useItemThumbs } from "../lib/itemImages";
 import { t } from "../i18n";
 
 export default function ItemCard(props: { item: PricedItem }) {
   const it = () => props.item;
   const usedIn = () => it().used_in ?? [];
+  const thumbOf = useItemThumbs();
   return (
     <article class="surface p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-line-strong flex flex-col justify-between">
       <div>
-        <header class="flex items-start justify-between gap-3 mb-3">
-          <div class="min-w-0">
+        <header class="flex items-start gap-3 mb-3">
+          <ItemThumb src={thumbOf(it().slug)} name={it().name} size={44} />
+          <div class="min-w-0 flex-1">
             <h3 class="text-fg font-semibold tracking-tight text-[15px]">{it().name}</h3>
             <Show when={it().slug}>
               <div class="text-[11px] text-dim tracking-wide select-all mt-0.5">{it().slug}</div>
