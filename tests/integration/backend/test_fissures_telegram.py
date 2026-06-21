@@ -29,6 +29,17 @@ async def test_send_message_hits_correct_url(httpx_mock: HTTPXMock) -> None:
     assert body == {"chat_id": 555, "text": "hi"}
 
 
+@pytest.mark.asyncio
+async def test_get_me_returns_username(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        url="https://tg.test/botTOKEN/getMe", method="GET",
+        json={"ok": True, "result": {"id": 42, "is_bot": True, "username": "kirills_warframe_bot"}},
+    )
+    c = TelegramClient(token="TOKEN", base_url="https://tg.test")
+    me = await c.get_me()
+    assert me["username"] == "kirills_warframe_bot"
+
+
 class _CapturingClient:
     def __init__(self) -> None:
         self.sent: list[tuple[int, str]] = []

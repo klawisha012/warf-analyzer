@@ -295,4 +295,4 @@ export type FissureSubscriptionCreate = {
 
 export type TelegramChatRow = { chat_id: number; username: string | null; registered_at: number };
 
-export type TelegramChatsResponse = { bot_enabled: boolean; total: number; items: TelegramChatRow[] };
+export type TelegramChatsResponse = { bot_enabled: boolean; bot_username: string | null; total: number; items: TelegramChatRow[] };

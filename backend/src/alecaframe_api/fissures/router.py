@@ -110,13 +110,35 @@ async def remove_subscription(sub_id: int, repo: RepoDep) -> dict:
     return {"removed": sub_id}
 
 
+_bot_username_cache: dict[str, str | None] = {}
+
+
+async def _bot_username() -> str | None:
+    """Bot's @username via Telegram getMe, cached (it never changes at runtime)."""
+    from alecaframe_api.main import telegram_client  # noqa: PLC0415
+    if telegram_client is None:
+        return None
+    if "v" in _bot_username_cache:
+        return _bot_username_cache["v"]
+    try:
+        me = await telegram_client.get_me()
+        username = me.get("username")
+    except Exception as e:
+        log.warning("telegram getMe failed: %s", e)
+        return None
+    _bot_username_cache["v"] = username
+    return username
+
+
 @router.get("/telegram/chats", response_model=TelegramChatsResponse)
 async def telegram_chats(repo: RepoDep) -> TelegramChatsResponse:
     from alecaframe_api.config import get_settings  # noqa: PLC0415
     rows = await repo.list_telegram_chats()
     items = [TelegramChatRow(**r) for r in rows]
     return TelegramChatsResponse(
-        bot_enabled=bool(get_settings().tg_api_key), total=len(items), items=items,
+        bot_enabled=bool(get_settings().tg_api_key),
+        bot_username=await _bot_username(),
+        total=len(items), items=items,
     )
 
 

@@ -57,6 +57,18 @@ class TelegramClient:
             raise TelegramError(f"getUpdates not ok: {str(data)[:200]}")
         return data.get("result") or []
 
+    async def get_me(self) -> dict:
+        """Bot's own info (getMe) — used to surface its public @username so the
+        UI can link to https://t.me/<username>."""
+        async with httpx.AsyncClient(timeout=self.timeout) as c:
+            resp = await c.get(self._url("getMe"))
+        if resp.status_code >= 400:
+            raise TelegramError(f"getMe status {resp.status_code}")
+        data = resp.json()
+        if not data.get("ok"):
+            raise TelegramError(f"getMe not ok: {str(data)[:200]}")
+        return data.get("result") or {}
+
 
 @dataclass
 class TelegramBot:

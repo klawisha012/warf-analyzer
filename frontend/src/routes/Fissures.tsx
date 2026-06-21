@@ -154,6 +154,16 @@ export default function Fissures() {
               fallback={<div class="text-sm text-amber-300">{t("fissures.botDisabled")}</div>}
             >
               <p class="text-sm text-slate-400">{t("fissures.startHint")}</p>
+              <Show when={chats.data?.bot_username}>
+                <a
+                  href={`https://t.me/${chats.data!.bot_username}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 text-sm rounded-md bg-sky-600/20 text-sky-300 hover:bg-sky-600/30 border border-sky-500/20"
+                >
+                  @{chats.data!.bot_username} ↗
+                </a>
+              </Show>
               <div class="mt-2">
                 <Show
                   when={(chats.data?.items ?? []).length > 0}

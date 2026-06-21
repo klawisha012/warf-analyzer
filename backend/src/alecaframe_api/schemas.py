@@ -403,5 +403,6 @@ class TelegramChatRow(BaseModel):
 
 class TelegramChatsResponse(BaseModel):
     bot_enabled: bool
+    bot_username: str | None = None
     total: int
     items: list[TelegramChatRow]
