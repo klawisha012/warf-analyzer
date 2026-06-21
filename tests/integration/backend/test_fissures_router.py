@@ -8,7 +8,7 @@ from httpx import ASGITransport
 from alecaframe_api.db.repo import Repo
 from alecaframe_api.fissures.models import Fissure
 from alecaframe_api.fissures.router import router
-from alecaframe_api.fissures.dependencies import get_fissure_client
+from alecaframe_api.fissures.dependencies import get_fissure_client, get_node_catalog
 from alecaframe_api.wfm.dependencies import get_repo
 
 
@@ -19,6 +19,11 @@ class _FakeClient:
                         activation=None, expiry=None)]
 
 
+class _FakeCatalog:
+    async def get(self, *, now=None) -> dict[str, list[str]]:
+        return {"Sedna": ["Adaro (Sedna)", "Kappa (Sedna)"], "Neptune": ["Galatea (Neptune)"]}
+
+
 @pytest.fixture
 async def client(tmp_path):
     repo = Repo(db_path=tmp_path / "t.db")
@@ -27,6 +32,7 @@ async def client(tmp_path):
     app.include_router(router)
     app.dependency_overrides[get_repo] = lambda: repo
     app.dependency_overrides[get_fissure_client] = lambda: _FakeClient()
+    app.dependency_overrides[get_node_catalog] = lambda: _FakeCatalog()
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
         yield c
@@ -87,3 +93,14 @@ async def test_subscription_with_planet_and_node(client: httpx.AsyncClient) -> N
     item = r.json()["items"][0]
     assert item["planet"] == "Neptune"
     assert item["node"] == "Proteus"
+
+
+@pytest.mark.asyncio
+async def test_meta_includes_nodes_by_planet(client: httpx.AsyncClient) -> None:
+    r = await client.get("/fissures/meta")
+    assert r.status_code == 200
+    body = r.json()
+    # full star-chart catalogue (incl. nodes with no live fissure right now)
+    assert body["nodes_by_planet"]["Sedna"] == ["Adaro (Sedna)", "Kappa (Sedna)"]
+    # catalogue planets are unioned into the selectable planet list
+    assert "Sedna" in body["planets"]

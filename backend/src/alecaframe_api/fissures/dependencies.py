@@ -6,8 +6,10 @@ from typing import Annotated
 from fastapi import Depends
 
 from alecaframe_api.fissures.client import FissureClient
+from alecaframe_api.reference.nodes_loader import NodeCatalog
 
 fissure_client: FissureClient | None = None
+node_catalog: NodeCatalog | None = None
 
 
 def get_fissure_client() -> FissureClient:
@@ -16,4 +18,11 @@ def get_fissure_client() -> FissureClient:
     return fissure_client
 
 
+def get_node_catalog() -> NodeCatalog:
+    if node_catalog is None:
+        raise RuntimeError("NodeCatalog not initialised; main.py lifespan must set it")
+    return node_catalog
+
+
 FissureClientDep = Annotated[FissureClient, Depends(get_fissure_client)]
+NodeCatalogDep = Annotated[NodeCatalog, Depends(get_node_catalog)]

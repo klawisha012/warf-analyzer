@@ -8,7 +8,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, status
 
 from alecaframe_api.fissures.client import FissureClientError
-from alecaframe_api.fissures.dependencies import FissureClientDep
+from alecaframe_api.fissures.dependencies import FissureClientDep, NodeCatalogDep
 from alecaframe_api.fissures.models import Fissure
 from alecaframe_api.schemas import (
     FissureMetaResponse, FissureRow, FissuresResponse,
@@ -78,7 +78,7 @@ async def list_fissures(client: FissureClientDep) -> FissuresResponse:
 
 @router.get("/meta", response_model=FissureMetaResponse,
             summary="All fissure axes (eras, mission types, planets, live nodes)")
-async def fissures_meta(client: FissureClientDep) -> FissureMetaResponse:
+async def fissures_meta(client: FissureClientDep, catalog: NodeCatalogDep) -> FissureMetaResponse:
     live_missions: set[str] = set()
     live_planets: set[str] = set()
     live_nodes: set[str] = set()
@@ -91,11 +91,13 @@ async def fissures_meta(client: FissureClientDep) -> FissureMetaResponse:
                 live_nodes.add(f.node)
     except FissureClientError:
         pass
+    nodes_by_planet = await catalog.get()
     return FissureMetaResponse(
         eras=ERAS,
         mission_types=sorted(set(KNOWN_MISSION_TYPES) | live_missions),
-        planets=sorted(set(KNOWN_PLANETS) | live_planets),
+        planets=sorted(set(KNOWN_PLANETS) | live_planets | set(nodes_by_planet)),
         nodes=sorted(live_nodes),
+        nodes_by_planet=nodes_by_planet,
     )
 
 

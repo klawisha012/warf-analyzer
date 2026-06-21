@@ -393,6 +393,9 @@ class FissureMetaResponse(BaseModel):
     mission_types: list[str]
     planets: list[str]
     nodes: list[str]
+    # full star-chart catalogue {planet: [node display names]} for the
+    # planet-scoped node picker; {} when the WFCD source is unreachable.
+    nodes_by_planet: dict[str, list[str]] = {}
 
 
 class FissureSubscriptionRow(BaseModel):
