@@ -12,6 +12,10 @@ def matches(fissure: Fissure, sub: Subscription) -> bool:
         return False
     if sub.mission_type is not None and fissure.mission_type != sub.mission_type:
         return False
+    if sub.planet is not None and fissure.planet != sub.planet:
+        return False
+    if sub.node is not None and sub.node.lower() not in (fissure.node or "").lower():
+        return False
     if sub.is_hard is not None and fissure.is_hard != sub.is_hard:
         return False
     if sub.is_storm is not None and fissure.is_storm != sub.is_storm:

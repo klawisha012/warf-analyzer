@@ -26,6 +26,8 @@ class Subscription:
     id: int
     era: str | None          # None = any
     mission_type: str | None # None = any
+    planet: str | None       # None = any (exact match)
+    node: str | None         # None = any (case-insensitive substring)
     is_hard: bool | None     # None = any
     is_storm: bool | None    # None = any
     enabled: bool
