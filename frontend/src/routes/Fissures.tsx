@@ -60,6 +60,31 @@ export default function Fissures() {
     return p && byPlanet[p]?.length ? byPlanet[p] : (meta.data?.nodes ?? []);
   };
 
+  // Any non-empty filter is an active constraint.
+  const hasFilters = () =>
+    !!(era() || mission() || planet() || node().trim() || hard() || storm());
+
+  // The same controls that build a subscription also narrow the live list;
+  // an empty value means "no constraint" for that field.
+  const filteredLive = () => {
+    const items = live.data?.items ?? [];
+    const e = era(), m = mission(), p = planet();
+    const n = node().trim().toLowerCase();
+    const h = triToBool(hard()), s = triToBool(storm());
+    return items.filter((f) =>
+      (!e || f.era === e) &&
+      (!m || f.mission_type === m) &&
+      (!p || f.planet === p) &&
+      (!n || (f.node ?? "").toLowerCase() === n) &&
+      (h === null || f.is_hard === h) &&
+      (s === null || f.is_storm === s),
+    );
+  };
+
+  function clearFilters() {
+    setEra(""); setMission(""); setPlanet(""); setNode(""); setHard(""); setStorm("");
+  }
+
   async function addSub() {
     await fetchers.fissuresSubAdd({
       era: era() || null,
@@ -202,12 +227,25 @@ export default function Fissures() {
         </div>
 
         <Card title={t("fissures.live")}>
+          <Show when={hasFilters()}>
+            <div class="flex items-center justify-between mb-3 text-xs text-dim">
+              <span class="num">{filteredLive().length} / {(live.data?.items ?? []).length}</span>
+              <button type="button" onClick={clearFilters} class="text-dim hover:text-fg transition-colors">
+                {t("fissures.clearFilters")}
+              </button>
+            </div>
+          </Show>
           <Show
-            when={(live.data?.items ?? []).length > 0}
-            fallback={<EmptyState title={t("fissures.liveEmpty")} hint="" />}
+            when={filteredLive().length > 0}
+            fallback={
+              <EmptyState
+                title={(live.data?.items ?? []).length > 0 ? t("fissures.liveNoMatch") : t("fissures.liveEmpty")}
+                hint=""
+              />
+            }
           >
             <ul class="space-y-1.5">
-              <For each={live.data?.items ?? []}>
+              <For each={filteredLive()}>
                 {(f) => (
                   <li class="flex items-center justify-between gap-2 px-3 py-2.5 rounded-[10px] hover:bg-white/[0.03] transition-colors">
                     <span class="flex flex-wrap items-center gap-2">

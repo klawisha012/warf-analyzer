@@ -168,6 +168,8 @@ export const en = {
     sendTest: "Send test message",
     live: "Active fissures",
     liveEmpty: "No active fissures right now",
+    liveNoMatch: "No active fissures match your filters",
+    clearFilters: "Clear filters",
   },
   langToggle: {
     label: "Language",

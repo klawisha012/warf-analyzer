@@ -169,6 +169,8 @@ export const ru = {
     sendTest: "Отправить тест",
     live: "Активные разрывы",
     liveEmpty: "Сейчас активных разрывов нет",
+    liveNoMatch: "Под выбранные фильтры активных разрывов нет",
+    clearFilters: "Сбросить фильтры",
   },
   langToggle: {
     label: "Язык",
