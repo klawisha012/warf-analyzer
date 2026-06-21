@@ -249,3 +249,45 @@ export type WtbMatch = {
 };
 
 export type WtbMatchResponse = { total: number; items: WtbMatch[] };
+
+// ----- void fissures -------------------------------------------------------
+
+export type FissureRow = {
+  id: string;
+  era: string;
+  mission_type: string;
+  node: string;
+  planet: string | null;
+  enemy: string | null;
+  is_hard: boolean;
+  is_storm: boolean;
+  expiry: string | null;
+  eta_seconds: number | null;
+};
+
+export type FissuresResponse = { total: number; items: FissureRow[] };
+
+export type FissureMetaResponse = { eras: string[]; mission_types: string[] };
+
+export type FissureSubscriptionRow = {
+  id: number;
+  era: string | null;
+  mission_type: string | null;
+  is_hard: boolean | null;
+  is_storm: boolean | null;
+  enabled: boolean;
+  created_at: number;
+};
+
+export type FissureSubscriptionsResponse = { total: number; items: FissureSubscriptionRow[] };
+
+export type FissureSubscriptionCreate = {
+  era: string | null;
+  mission_type: string | null;
+  is_hard: boolean | null;
+  is_storm: boolean | null;
+};
+
+export type TelegramChatRow = { chat_id: number; username: string | null; registered_at: number };
+
+export type TelegramChatsResponse = { bot_enabled: boolean; total: number; items: TelegramChatRow[] };
