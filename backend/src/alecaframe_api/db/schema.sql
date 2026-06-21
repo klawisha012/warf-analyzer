@@ -119,6 +119,8 @@ CREATE TABLE IF NOT EXISTS fissure_subscription (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   era          TEXT,            -- NULL = any
   mission_type TEXT,            -- NULL = any
+  planet       TEXT,            -- NULL = any (exact match)
+  node         TEXT,            -- NULL = any (case-insensitive substring)
   is_hard      INTEGER,         -- 0 | 1 | NULL(any)
   is_storm     INTEGER,         -- 0 | 1 | NULL(any)
   enabled      INTEGER NOT NULL DEFAULT 1,

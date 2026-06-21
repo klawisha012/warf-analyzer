@@ -50,6 +50,8 @@ class Repo:
             # ALTER). Each add is wrapped — "duplicate column name" is the
             # expected error on already-migrated DBs and is swallowed.
             await _try_add_column(conn, "riven_auction", "owner_status TEXT")
+            await _try_add_column(conn, "fissure_subscription", "planet TEXT")
+            await _try_add_column(conn, "fissure_subscription", "node TEXT")
             await conn.commit()
         except Exception:
             await conn.close()
@@ -430,14 +432,15 @@ class Repo:
 
     async def add_fissure_subscription(
         self, *, era: str | None, mission_type: str | None,
+        planet: str | None = None, node: str | None = None,
         is_hard: bool | None, is_storm: bool | None, ts: int,
     ) -> int:
         conn = self._require_conn()
         cur = await conn.execute(
             """INSERT INTO fissure_subscription
-               (era, mission_type, is_hard, is_storm, enabled, created_at)
-               VALUES (?, ?, ?, ?, 1, ?)""",
-            (era, mission_type,
+               (era, mission_type, planet, node, is_hard, is_storm, enabled, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, 1, ?)""",
+            (era, mission_type, planet, node,
              None if is_hard is None else int(is_hard),
              None if is_storm is None else int(is_storm),
              ts),
@@ -449,7 +452,7 @@ class Repo:
         self, *, enabled_only: bool = False,
     ) -> list[dict[str, Any]]:
         conn = self._require_conn()
-        sql = ("SELECT id, era, mission_type, is_hard, is_storm, enabled, created_at "
+        sql = ("SELECT id, era, mission_type, planet, node, is_hard, is_storm, enabled, created_at "
                "FROM fissure_subscription")
         if enabled_only:
             sql += " WHERE enabled = 1"

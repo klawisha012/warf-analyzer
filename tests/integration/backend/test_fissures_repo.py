@@ -51,3 +51,17 @@ async def test_notification_dedup_and_prune(repo: Repo) -> None:
     assert await repo.record_fissure_notification(subscription_id=1, fissure_id="f2", ts=100) is True
     pruned = await repo.prune_fissure_notifications(older_than=150)
     assert pruned == 2  # f1@100 and f2@100 removed; none left below 150
+
+
+async def test_subscription_planet_node_round_trip(repo: Repo) -> None:
+    await repo.add_fissure_subscription(
+        era=None, mission_type=None, planet="Neptune", node="Proteus",
+        is_hard=None, is_storm=None, ts=100,
+    )
+    await repo.add_fissure_subscription(
+        era="Axi", mission_type=None, is_hard=None, is_storm=None, ts=101,
+    )
+    rows = await repo.list_fissure_subscriptions()
+    by_era = {r["era"]: r for r in rows}
+    assert by_era[None]["planet"] == "Neptune" and by_era[None]["node"] == "Proteus"
+    assert by_era["Axi"]["planet"] is None and by_era["Axi"]["node"] is None
