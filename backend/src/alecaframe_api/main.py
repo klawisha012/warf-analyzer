@@ -43,6 +43,7 @@ from .wfm.sets import SetComposition, SetIndex
 from .wfm.slugs import SlugResolver
 from .db.repo import Repo
 from .reference import stats_loader
+from .reference.nodes_loader import NodeCatalog
 from .reference.router import router as reference_router
 from .wfm.history_router import router as history_router
 from .wfm.recipe_uses import RecipeUse, load_recipe_uses
@@ -255,6 +256,7 @@ async def lifespan(app: FastAPI):
         base_url=_settings.fissure_source_base_url,
         platform=_settings.wfm_platform,
     )
+    fissures_deps.node_catalog = NodeCatalog()
     if _settings.tg_api_key:
         telegram_client = TelegramClient(token=_settings.tg_api_key)
     fissure_poller = FissurePoller(
