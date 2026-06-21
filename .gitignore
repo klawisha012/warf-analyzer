@@ -43,3 +43,4 @@ scratch/
 
 # one-off generated probe output
 scripts/probe_dll_output.json
+.gstack/

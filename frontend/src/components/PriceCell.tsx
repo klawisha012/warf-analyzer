@@ -9,12 +9,9 @@ export default function PriceCell(props: { item: PricedItem }) {
   // need to undercut on WFM.
   const sellMin = () => priceFor(props.item.slug)?.sell_min ?? props.item.sell_min;
   return (
-    <div class="text-right font-mono text-[13px]">
-      <Show
-        when={sellMin() != null}
-        fallback={<span class="text-slate-600">—</span>}
-      >
-        <div class="text-slate-200 font-semibold">{fmtPlat(sellMin())}</div>
+    <div class="text-right num text-[13px]">
+      <Show when={sellMin() != null} fallback={<span class="text-dim">—</span>}>
+        <span class="text-fg font-semibold">{fmtPlat(sellMin())}</span>
       </Show>
     </div>
   );

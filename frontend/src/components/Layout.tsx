@@ -1,26 +1,74 @@
-import { createSignal, Show, type JSX } from "solid-js";
+import { createSignal, For, Show, type JSX } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
-import { useQueryClient } from "@tanstack/solid-query";
-import { fetchers } from "../api/queries";
+import { createQuery, useQueryClient } from "@tanstack/solid-query";
+import { fetchers, keys } from "../api/queries";
 import { t, locale, setLocale } from "../i18n";
 
 type LayoutProps = { children?: JSX.Element };
 
-const NAV = [
-  { href: "/",            key: "nav.dashboard"  },
+const reduceMotion =
+  typeof window !== "undefined" &&
+  window.matchMedia &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Icons (18×18 line glyphs) ---------------------------------------------------
+const IcoDashboard = () => (
+  <svg viewBox="0 0 24 24" fill="none"><path d="M4 13h6V4H4v9zm0 7h6v-5H4v5zm10 0h6V11h-6v9zm0-16v5h6V4h-6z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+);
+const IcoProfile = () => (
+  <svg viewBox="0 0 24 24" fill="none"><path d="M12 12a4 4 0 100-8 4 4 0 000 8z" stroke="currentColor" stroke-width="1.6"/><path d="M4 21a8 8 0 0116 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+);
+const IcoRiven = () => (
+  <svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.4 5.6L20 9l-4.5 3.8L17 19l-5-3-5 3 1.5-6.2L4 9l5.6-1.4L12 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+);
+const IcoBell = () => (
+  <svg viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M13.7 21a2 2 0 01-3.4 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+);
+
+const PROFILE_CHILDREN = [
   { href: "/inventory",   key: "nav.inventory"  },
   { href: "/prime-parts", key: "nav.primeParts" },
+  { href: "/sets",        key: "nav.sets"       },
   { href: "/mods",        key: "nav.mods"       },
   { href: "/arcanes",     key: "nav.arcanes"    },
-  { href: "/sets",        key: "nav.sets"       },
-  { href: "/rivens",      key: "nav.rivens"     },
-  { href: "/fissures",    key: "nav.fissures"   },
 ] as const;
 
 export default function Layout(props: LayoutProps) {
   const loc = useLocation();
   const qc = useQueryClient();
   const [state, setState] = createSignal<"idle" | "pending" | "error">("idle");
+
+  const childInActive = () => PROFILE_CHILDREN.some((c) => loc.pathname === c.href);
+  const [open, setOpen] = createSignal(true);
+  let childrenRef: HTMLDivElement | undefined;
+
+  function toggleGroup() {
+    const el = childrenRef;
+    if (!el) { setOpen((o) => !o); return; }
+    if (open()) {
+      el.style.height = el.scrollHeight + "px";
+      requestAnimationFrame(() => { el.style.height = "0px"; });
+      setOpen(false);
+    } else {
+      setOpen(true);
+      el.style.height = el.scrollHeight + "px";
+      const onEnd = (e: TransitionEvent) => {
+        if (e.propertyName === "height") {
+          el.style.height = "auto";
+          el.removeEventListener("transitionend", onEnd);
+        }
+      };
+      el.addEventListener("transitionend", onEnd);
+    }
+  }
+
+  const health = createQuery(() => ({
+    queryKey: keys.healthz(),
+    queryFn:  fetchers.healthz,
+    refetchInterval: 30_000,
+  }));
+  const userName = () => health.data?.wfm_username ?? "Tenno";
+  const initials = () => userName().slice(0, 2).toUpperCase();
 
   async function handleRefresh() {
     if (state() === "pending") return;
@@ -38,100 +86,119 @@ export default function Layout(props: LayoutProps) {
     }
   }
 
+  function magMove(e: MouseEvent & { currentTarget: HTMLButtonElement }) {
+    if (reduceMotion) return;
+    const b = e.currentTarget;
+    const r = b.getBoundingClientRect();
+    const clamp = (v: number) => Math.max(-8, Math.min(8, v));
+    const dx = clamp((e.clientX - (r.left + r.width / 2)) * 0.3);
+    const dy = clamp((e.clientY - (r.top + r.height / 2)) * 0.3);
+    b.style.transform = `translate(${dx}px, ${dy}px)`;
+  }
+  function magLeave(e: MouseEvent & { currentTarget: HTMLButtonElement }) {
+    e.currentTarget.style.transform = "translate(0, 0)";
+  }
+
   return (
-    <div class="min-h-screen text-slate-100 relative pb-12">
-      <header class="sticky top-0 z-50 bg-slate-950/40 backdrop-blur-2xl border-b border-white/[0.04] shadow-[0_4px_30px_rgba(0,0,0,0.2)]">
-        <nav class="max-w-6xl mx-auto px-6 py-4 flex items-center gap-2">
-          {/* Futuristic High-Tech Logo & Emblem */}
-          <div class="flex items-center gap-3 mr-6">
-            <div class="relative w-8 h-8 flex items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
-              <svg class="w-4.5 h-4.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707.707M12 8a4 4 0 100 8 4 4 0 000-8z"></path>
-              </svg>
-              <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-              <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400"></span>
-            </div>
-            <span class="font-bold tracking-tight text-lg text-slate-100 flex items-center gap-1.5">
-              Aleca<span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300">Frame</span>
-            </span>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Главная навигация">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L21 7v10l-9 5-9-5V7l9-5z" stroke="#fff" stroke-width="1.6" stroke-linejoin="round" opacity="0.95"/>
+              <path d="M12 2v20M3 7l9 5 9-5" stroke="#fff" stroke-width="1.4" stroke-linejoin="round" opacity="0.65"/>
+            </svg>
           </div>
+          <div class="brand-name">Aleca<span class="dot">Frame</span></div>
+        </div>
 
-          {/* Navigation Links */}
-          <div class="flex items-center gap-1.5">
-            {NAV.map((item) => (
-              <A
-                href={item.href}
-                end={item.href === "/"}
-                class="px-4 py-1.5 rounded-xl text-sm font-medium transition-all duration-300 border border-transparent"
-                classList={{
-                  "bg-gradient-to-r from-emerald-500/10 to-teal-500/10 text-emerald-300 border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.04)]": loc.pathname === item.href,
-                  "text-slate-400 hover:text-slate-100 hover:bg-white/[0.02] hover:border-white/[0.04]": loc.pathname !== item.href,
-                }}
-              >
-                {t(item.key)}
-              </A>
-            ))}
-          </div>
+        <nav class="nav">
+          {/* Dashboard */}
+          <A href="/" end class="nav-item" activeClass="active">
+            <span class="nav-ico" aria-hidden="true"><IcoDashboard /></span>
+            <span class="nav-label">{t("nav.dashboard")}</span>
+          </A>
 
-          {/* Refresh Control */}
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={state() === "pending"}
-            class="ml-auto flex items-center gap-2 px-4 py-1.5 rounded-xl text-sm border font-medium transition-all duration-300 disabled:cursor-wait"
-            classList={{
-              "border-slate-800 bg-slate-900/30 text-slate-300 hover:text-slate-100 hover:bg-slate-900/70 hover:border-slate-700/50 shadow-sm": state() === "idle",
-              "border-emerald-900/30 bg-emerald-950/10 text-emerald-400 font-semibold shadow-[0_0_15px_rgba(16,185,129,0.05)]": state() === "pending",
-              "border-red-900/30 bg-red-950/10 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.05)]": state() === "error",
-            }}
-            aria-label={t("nav.refresh")}
-          >
-            <Show when={state() === "pending"}>
-              <svg class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3m0 0l3 3m-3-3v12"></path>
-              </svg>
-            </Show>
-            <span>
-              {state() === "pending"
-                ? t("nav.refreshing")
-                : state() === "error"
-                  ? t("nav.refreshFailed")
-                  : t("nav.refresh")}
-            </span>
-          </button>
-
-          {/* Premium Language Toggler */}
-          <div
-            class="ml-3 flex items-center gap-0.5 rounded-xl border border-white/[0.04] bg-slate-950/30 p-0.5 shadow-inner"
-            role="group"
-            aria-label={t("langToggle.label")}
-          >
-            <button
-              type="button"
-              onClick={() => setLocale("ru")}
-              class="px-3 py-1 text-xs rounded-lg font-medium transition-all duration-300"
-              classList={{
-                "bg-slate-900/80 text-emerald-400 shadow-sm border border-emerald-500/20": locale() === "ru",
-                "text-slate-400 hover:text-slate-200": locale() !== "ru",
-              }}
+          {/* Profile group */}
+          <div classList={{ "nav-group": true, open: open() }}>
+            <div
+              class="nav-item"
+              classList={{ active: childInActive() && !open() }}
+              role="button"
+              tabindex="0"
+              aria-expanded={open()}
+              onClick={toggleGroup}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleGroup(); } }}
             >
+              <span class="nav-ico" aria-hidden="true"><IcoProfile /></span>
+              <span class="nav-label">{t("nav.profile")}</span>
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="nav-children" ref={childrenRef} role="group" aria-label={t("nav.profile")}>
+              <div class="nav-children-inner">
+                <For each={PROFILE_CHILDREN}>
+                  {(c) => (
+                    <A href={c.href} class="nav-child" activeClass="active">{t(c.key)}</A>
+                  )}
+                </For>
+              </div>
+            </div>
+          </div>
+
+          <div class="nav-divider" role="separator" />
+
+          {/* Riven Analyzer */}
+          <A href="/rivens" class="nav-item riven" activeClass="active">
+            <span class="nav-ico" aria-hidden="true"><IcoRiven /></span>
+            <span class="nav-label">{t("nav.rivenAnalyzer")}</span>
+          </A>
+
+          {/* Notifications (Fissures) */}
+          <A href="/fissures" class="nav-item" activeClass="active">
+            <span class="nav-ico" aria-hidden="true"><IcoBell /></span>
+            <span class="nav-label">{t("nav.notifications")}</span>
+          </A>
+        </nav>
+
+        <div class="account" role="button" tabindex="0" title={userName()}>
+          <div class="avatar" aria-hidden="true">{initials()}</div>
+          <div class="account-meta">
+            <div class="account-name">{userName()}</div>
+            <div class="account-rep">
+              <Show when={health.data?.ok} fallback={<span>{t("common.offline")}</span>}>
+                <span>{t("common.online")}</span>
+              </Show>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <div class="content-col">
+        <div class="topbar">
+          <div class="lang-toggle" role="group" aria-label={t("langToggle.label")}>
+            <button type="button" classList={{ active: locale() === "ru" }} aria-pressed={locale() === "ru"} onClick={() => setLocale("ru")}>
               {t("langToggle.ru")}
             </button>
-            <button
-              type="button"
-              onClick={() => setLocale("en")}
-              class="px-3 py-1 text-xs rounded-lg font-medium transition-all duration-300"
-              classList={{
-                "bg-slate-900/80 text-emerald-400 shadow-sm border border-emerald-500/20": locale() === "en",
-                "text-slate-400 hover:text-slate-200": locale() !== "en",
-              }}
-            >
+            <button type="button" classList={{ active: locale() === "en" }} aria-pressed={locale() === "en"} onClick={() => setLocale("en")}>
               {t("langToggle.en")}
             </button>
           </div>
-        </nav>
-      </header>
-      <main class="max-w-6xl mx-auto px-6 py-8 relative z-10">{props.children}</main>
+          <button
+            type="button"
+            class="btn-primary"
+            classList={{ spinning: state() === "pending" }}
+            disabled={state() === "pending"}
+            onClick={handleRefresh}
+            onMouseMove={magMove}
+            onMouseLeave={magLeave}
+            aria-label={t("nav.refresh")}
+          >
+            <svg class="btn-ico" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 12a9 9 0 11-2.64-6.36M21 4v5h-5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            {state() === "pending" ? t("nav.refreshing") : state() === "error" ? t("nav.refreshFailed") : t("nav.refresh")}
+          </button>
+        </div>
+        <main class="content-main">{props.children}</main>
+      </div>
     </div>
   );
 }

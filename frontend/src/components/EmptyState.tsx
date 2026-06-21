@@ -6,10 +6,10 @@ export default function EmptyState(props: {
   icon?: JSX.Element;
 }) {
   return (
-    <div class="text-center py-12 text-slate-400">
-      {props.icon && <div class="mb-2 flex justify-center">{props.icon}</div>}
-      <div class="text-slate-200 font-medium">{props.title}</div>
-      {props.hint && <div class="text-sm mt-1">{props.hint}</div>}
+    <div class="text-center py-14 text-sub">
+      {props.icon && <div class="mb-3 flex justify-center text-dim">{props.icon}</div>}
+      <div class="text-fg font-semibold">{props.title}</div>
+      {props.hint && <div class="text-sm text-dim mt-1.5">{props.hint}</div>}
     </div>
   );
 }
