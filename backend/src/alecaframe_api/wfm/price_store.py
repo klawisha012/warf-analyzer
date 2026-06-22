@@ -16,23 +16,25 @@ inspection. We do NOT persist this store to Redis: process restart triggers
 a cold refetch on first /me/* hit, which finishes in single-digit seconds
 thanks to parallel WFMClient + the Redis L1 cache it already uses.
 """
+
 from __future__ import annotations
 
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 
 @dataclass(frozen=True)
 class PriceStats:
     """Snapshot of WFM order-book stats for a single slug."""
+
     slug: str
     sell_min: int | None
     sell_median: int | None
     sell_spread: int | None
     buy_max: int | None
-    fetched_at: float           # unix timestamp; used by stale_slugs()
-    stale: bool = False         # True if fetched_at is from a stale-fallback (WFM down)
+    fetched_at: float  # unix timestamp; used by stale_slugs()
+    stale: bool = False  # True if fetched_at is from a stale-fallback (WFM down)
     sell_min_max_rank: int | None = None
     buy_max_max_rank: int | None = None
     max_rank: int | None = None

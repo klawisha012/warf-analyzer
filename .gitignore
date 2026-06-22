@@ -43,3 +43,11 @@ scratch/
 
 # one-off generated probe output
 scripts/probe_dll_output.json
+.gstack/
+
+# Tooling caches / test artifacts
+.ruff_cache/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+frontend/.playwright/

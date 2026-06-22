@@ -31,13 +31,21 @@ export const locale = _locale;
 
 export function setLocale(next: Locale): void {
   _setLocale(next);
-  try { localStorage.setItem(STORAGE_KEY, next); } catch { /* ignore (SSR / private mode) */ }
+  try {
+    localStorage.setItem(STORAGE_KEY, next);
+  } catch {
+    /* ignore (SSR / private mode) */
+  }
 }
 
 // Hand-rolled flatten — the lib's `flatten` has strict template-literal typing
 // that fights with our 3-deep nested dicts (inventory.slot.warframe, etc.).
 // Recursing manually keeps the runtime behavior identical and the types simple.
-function flattenDict(obj: unknown, prefix = "", out: Record<string, string> = {}): Record<string, string> {
+function flattenDict(
+  obj: unknown,
+  prefix = "",
+  out: Record<string, string> = {},
+): Record<string, string> {
   if (obj && typeof obj === "object") {
     for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
       const key = prefix ? `${prefix}.${k}` : k;
@@ -52,6 +60,7 @@ function flattenDict(obj: unknown, prefix = "", out: Record<string, string> = {}
 }
 
 const flatDict = createMemo(() => flattenDict(dicts[_locale()]));
+// eslint-disable-next-line solid/reactivity -- translator() from @solid-primitives/i18n accepts an Accessor and tracks it internally
 const _t = i18n.translator(flatDict, i18n.resolveTemplate);
 
 export function t(key: string, params?: Record<string, string | number>): string {

@@ -17,18 +17,20 @@ Failure modes:
 The poller is a thin orchestrator — almost all logic is in helpers that are
 unit-testable without an event loop or a real Centrifugo.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Any
 
 from alecaframe_api.infra.push import CentrifugoPublisher
 from alecaframe_api.wfm.client import WFMClient, WFMError
-from alecaframe_api.wfm.prices import compute_stats
 from alecaframe_api.wfm.price_store import PriceStats, PriceStore
+from alecaframe_api.wfm.prices import compute_stats
 
 log = logging.getLogger("alecaframe.wfm.price_poller")
 
@@ -47,12 +49,17 @@ def slugs_from_channels(channels: Iterable[str]) -> set[str]:
     out: set[str] = set()
     for ch in channels:
         if ch.startswith(PRICE_CHANNEL_PREFIX):
-            out.add(ch[len(PRICE_CHANNEL_PREFIX):])
+            out.add(ch[len(PRICE_CHANNEL_PREFIX) :])
     return out
 
 
 def stats_from_orders(
-    slug: str, orders: list[dict], *, now: float, stale: bool = False, max_rank: int | None = None,
+    slug: str,
+    orders: list[dict],
+    *,
+    now: float,
+    stale: bool = False,
+    max_rank: int | None = None,
 ) -> PriceStats:
     """Project a raw WFM orders list into a PriceStats record.
 
@@ -73,7 +80,9 @@ def stats_from_orders(
     sell_min_max_rank = None
     buy_max_max_rank = None
     if max_rank is not None:
-        sell_max = compute_stats(orders, side="sell", online_only=True, mod_rank=max_rank)
+        sell_max = compute_stats(
+            orders, side="sell", online_only=True, mod_rank=max_rank
+        )
         buy_max = compute_stats(orders, side="buy", online_only=True, mod_rank=max_rank)
         sell_min_max_rank = sell_max.min_price
         buy_max_max_rank = buy_max.max_price
@@ -105,7 +114,9 @@ class PricePoller:
     async def tick(self) -> None:
         """Run one poll cycle. Safe to call from tests directly."""
         try:
-            channels = await self.publisher.list_channels(pattern=f"{PRICE_CHANNEL_PREFIX}*")
+            channels = await self.publisher.list_channels(
+                pattern=f"{PRICE_CHANNEL_PREFIX}*"
+            )
         except Exception as e:
             log.warning("list_channels failed: %s; skipping tick", e)
             return
@@ -149,7 +160,9 @@ class PricePoller:
                     elif level_stats:
                         max_rank = len(level_stats) - 1
 
-        stats = stats_from_orders(slug, orders, now=time.time(), stale=is_stale, max_rank=max_rank)
+        stats = stats_from_orders(
+            slug, orders, now=time.time(), stale=is_stale, max_rank=max_rank
+        )
         self.store.set(stats)
         await self.publisher.publish(
             f"{PRICE_CHANNEL_PREFIX}{slug}",
@@ -169,8 +182,11 @@ class PricePoller:
 
     async def run(self) -> None:
         """Long-running loop — call from a lifespan asyncio.create_task()."""
-        log.info("price poller starting; interval=%.1fs stale_threshold=%.1fs",
-                 self.poll_interval, self.stale_threshold)
+        log.info(
+            "price poller starting; interval=%.1fs stale_threshold=%.1fs",
+            self.poll_interval,
+            self.stale_threshold,
+        )
         while True:
             try:
                 await self.tick()

@@ -12,6 +12,7 @@ The slug subscription set comes from:
    that decrypt-agent writes — we read JSON directly to avoid a circular HTTP loop).
 2. A static watchlist file at `data/watchlist.txt` (one slug per line; optional).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -21,9 +22,9 @@ import signal
 import sys
 from pathlib import Path
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import httpx
 import redis.asyncio as redis_lib
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from alecaframe_api.config import get_settings
 from alecaframe_api.infra.broker import RabbitMQBus
@@ -91,7 +92,12 @@ async def _main() -> None:
         level=s.log_level,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
-    log.info("poller starting; agent=%s redis=%s rabbit=%s", s.agent_url, s.redis_url, s.rabbitmq_url)
+    log.info(
+        "poller starting; agent=%s redis=%s rabbit=%s",
+        s.agent_url,
+        s.redis_url,
+        s.rabbitmq_url,
+    )
 
     redis_client = redis_lib.from_url(s.redis_url, decode_responses=True)
     wfm_cache = Cache(client=redis_client, key_prefix="wfm")
@@ -103,8 +109,11 @@ async def _main() -> None:
             return r.json()["token"]
 
     wfm_client = WFMClient(
-        cache=wfm_cache, base_url=s.wfm_base_url, token_provider=_token,
-        platform=s.wfm_platform, language=s.wfm_language,
+        cache=wfm_cache,
+        base_url=s.wfm_base_url,
+        token_provider=_token,
+        platform=s.wfm_platform,
+        language=s.wfm_language,
         rate_limit_per_second=s.wfm_rate_limit_per_second,
     )
     resolver = SlugResolver()
@@ -124,27 +133,35 @@ async def _main() -> None:
 
     # First-time bootstrap
     await _refresh_subscription(
-        wfm_client=wfm_client, resolver=resolver,
-        socket_client=socket_client, data_dir=s.data_dir,
+        wfm_client=wfm_client,
+        resolver=resolver,
+        socket_client=socket_client,
+        data_dir=s.data_dir,
     )
 
     sched = AsyncIOScheduler()
     sched.add_job(
-        lambda: asyncio.create_task(_refresh_subscription(
-            wfm_client=wfm_client, resolver=resolver,
-            socket_client=socket_client, data_dir=s.data_dir,
-        )),
-        trigger="interval", minutes=30,
+        lambda: asyncio.create_task(
+            _refresh_subscription(
+                wfm_client=wfm_client,
+                resolver=resolver,
+                socket_client=socket_client,
+                data_dir=s.data_dir,
+            )
+        ),
+        trigger="interval",
+        minutes=30,
     )
 
     # Snapshot job — every 30 min, fetch /orders for each subscribed slug + write snapshot
     from alecaframe_api.db.repo import Repo
     from alecaframe_api.wfm.history import write_snapshot
+
     poller_repo = Repo(db_path=s.sqlite_path)
     await poller_repo.connect()
 
     async def _snapshot_subscribed_slugs() -> None:
-        for slug in list(socket_client._slugs)[:20]:   # cap to stay under rate limit
+        for slug in list(socket_client._slugs)[:20]:  # cap to stay under rate limit
             try:
                 payload = await wfm_client.get_orders(slug)
                 # WFM v2 returns {"apiVersion", "data": [...]} (was payload.orders in v1).
@@ -155,15 +172,18 @@ async def _main() -> None:
 
     sched.add_job(
         lambda: asyncio.create_task(_snapshot_subscribed_slugs()),
-        trigger="interval", minutes=30,
+        trigger="interval",
+        minutes=30,
     )
     sched.start()
 
     stop = asyncio.Event()
+
     def _handler() -> None:
         log.info("shutdown signal received")
         stop.set()
         socket_client.stop()
+
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         try:

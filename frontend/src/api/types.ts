@@ -62,6 +62,7 @@ export type PricedItem = {
   unique_name: string;
   name: string;
   slug: string | null;
+  image_name?: string | null;
   count: number | null;
   vaulted: boolean | null;
   sell_min: number | null;
@@ -81,6 +82,19 @@ export type PricedItemListResponse = {
   returned: number;
   items: PricedItem[];
 };
+
+export type ItemBaseStats = {
+  unique_name: string;
+  category: string | null;
+  name: string | null;
+  mastery_req: number | null;
+  disposition: number | null;
+  stats: Record<string, unknown>;
+  source: string | null;
+  updated_at: number | null;
+};
+
+export type ItemBaseStatsListResponse = { total: number; items: ItemBaseStats[] };
 
 export type RefreshResponse = {
   ok: boolean;
@@ -157,9 +171,17 @@ export type RivenAuctionRow = {
   mod_rank: number | null;
   polarity: string | null;
   owner_name: string | null;
-  owner_status: string | null;       // 'ingame' | 'online' | 'offline'
+  owner_status: string | null; // 'ingame' | 'online' | 'offline'
   tier: string;
   attributes: RivenAuctionAttribute[];
+  // Weapon-aware quality score (base profile in M1). grade/score are null when
+  // unscored (no base profile / melee — reason in unscored_reason).
+  grade: string | null;
+  score: number | null;
+  unscored: boolean;
+  unscored_reason: string | null;
+  // Quality x price: "steal" (S/A under median), "trap" (F over median), null. (S4)
+  market_signal: string | null;
 };
 
 export type RivenTierStats = {
@@ -272,12 +294,20 @@ export type FissureRow = {
 
 export type FissuresResponse = { total: number; items: FissureRow[] };
 
-export type FissureMetaResponse = { eras: string[]; mission_types: string[] };
+export type FissureMetaResponse = {
+  eras: string[];
+  mission_types: string[];
+  planets: string[];
+  nodes: string[];
+  nodes_by_planet: Record<string, string[]>;
+};
 
 export type FissureSubscriptionRow = {
   id: number;
   era: string | null;
   mission_type: string | null;
+  planet: string | null;
+  node: string | null;
   is_hard: boolean | null;
   is_storm: boolean | null;
   enabled: boolean;
@@ -289,10 +319,17 @@ export type FissureSubscriptionsResponse = { total: number; items: FissureSubscr
 export type FissureSubscriptionCreate = {
   era: string | null;
   mission_type: string | null;
+  planet: string | null;
+  node: string | null;
   is_hard: boolean | null;
   is_storm: boolean | null;
 };
 
 export type TelegramChatRow = { chat_id: number; username: string | null; registered_at: number };
 
-export type TelegramChatsResponse = { bot_enabled: boolean; bot_username: string | null; total: number; items: TelegramChatRow[] };
+export type TelegramChatsResponse = {
+  bot_enabled: boolean;
+  bot_username: string | null;
+  total: number;
+  items: TelegramChatRow[];
+};

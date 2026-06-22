@@ -9,14 +9,16 @@ Provides:
 In tests, set `bus._fake = _InMemoryBus()` and `bus._connected = True` to
 short-circuit the real connection.
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 import aio_pika
 
@@ -33,6 +35,7 @@ class _InMemoryBus:
     `wfm.live.orders` queue and `signals` exchange routes `new.*` →
     `signals.new` queue.
     """
+
     def __init__(self) -> None:
         self._inbox: dict[str, list[str]] = {"wfm.live.orders": [], "signals.new": []}
         self._handlers: dict[str, list[Handler]] = {}
@@ -69,7 +72,9 @@ class RabbitMQBus:
         await self._channel.set_qos(prefetch_count=20)
         self._connected = True
 
-    async def publish(self, exchange: str, routing_key: str, payload: dict[str, Any]) -> None:
+    async def publish(
+        self, exchange: str, routing_key: str, payload: dict[str, Any]
+    ) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         if self._fake is not None:
             await self._fake.publish(exchange, routing_key, body)

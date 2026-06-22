@@ -1,4 +1,5 @@
 """Backend consumer: drain wfm.live.orders, update Redis, publish to Centrifugo."""
+
 from __future__ import annotations
 
 import pytest
@@ -10,6 +11,7 @@ from alecaframe_api.wfm.consumer import handle_live_order
 @pytest.mark.asyncio
 async def test_handle_live_order_publishes_to_centrifugo() -> None:
     import fakeredis.aioredis
+
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     cache = Cache(client=redis, key_prefix="wfm")
     published: list[tuple[str, dict]] = []
@@ -21,9 +23,14 @@ async def test_handle_live_order_publishes_to_centrifugo() -> None:
     await handle_live_order(
         msg={
             "type": "@WS/SUBSCRIBE/NEW_ORDERS/UPDATE",
-            "payload": {"item": {"url_name": "kronen_prime_blade"}, "platinum": 33, "order_type": "sell"},
+            "payload": {
+                "item": {"url_name": "kronen_prime_blade"},
+                "platinum": 33,
+                "order_type": "sell",
+            },
         },
-        cache=cache, publisher=FakePublisher(),
+        cache=cache,
+        publisher=FakePublisher(),
     )
     assert len(published) == 1
     chan, data = published[0]
@@ -35,6 +42,7 @@ async def test_handle_live_order_publishes_to_centrifugo() -> None:
 @pytest.mark.asyncio
 async def test_handle_live_order_skips_when_no_slug() -> None:
     import fakeredis.aioredis
+
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     cache = Cache(client=redis, key_prefix="wfm")
     published = []
@@ -45,7 +53,8 @@ async def test_handle_live_order_skips_when_no_slug() -> None:
 
     await handle_live_order(
         msg={"type": "@WS/SOMETHING_ELSE", "payload": {}},
-        cache=cache, publisher=FakePublisher(),
+        cache=cache,
+        publisher=FakePublisher(),
     )
     assert published == []
     await redis.aclose()

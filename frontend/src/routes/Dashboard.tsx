@@ -1,30 +1,33 @@
 import { For, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
-import Card from "../components/Card";
-import Badge from "../components/Badge";
+import PageHeader from "../components/PageHeader";
+import StatTile from "../components/StatTile";
 import EmptyState from "../components/EmptyState";
+import ItemThumb from "../components/ItemThumb";
 import { fetchers, keys } from "../api/queries";
 import { fmtPlat, fmtInt } from "../lib/format";
+import { useItemThumbs } from "../lib/itemImages";
 import { useSlugChannel } from "../hooks/useSlugChannel";
 import { t } from "../i18n";
 
 export default function Dashboard() {
+  const thumbOf = useItemThumbs();
   const health = createQuery(() => ({
     queryKey: keys.healthz(),
-    queryFn:  fetchers.healthz,
+    queryFn: fetchers.healthz,
     refetchInterval: 5_000,
   }));
   const wtb = createQuery(() => ({
     queryKey: keys.meWtbMatches(15),
-    queryFn:  () => fetchers.meWtbMatches(15),
+    queryFn: () => fetchers.meWtbMatches(15),
   }));
   const sets = createQuery(() => ({
     queryKey: keys.meSetsProfit(10),
-    queryFn:  () => fetchers.meSetsProfit(10),
+    queryFn: () => fetchers.meSetsProfit(10),
   }));
   const nudges = createQuery(() => ({
     queryKey: keys.meRelistNudges(),
-    queryFn:  fetchers.meRelistNudges,
+    queryFn: fetchers.meRelistNudges,
   }));
 
   useSlugChannel(() => {
@@ -39,141 +42,223 @@ export default function Dashboard() {
   });
 
   return (
-    <div class="space-y-6">
-      {/* High-Tech Diagnostic Telemetry Cards */}
-      <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card title={t("dashboard.healthTitle")} class="relative overflow-hidden group">
-          <div class="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-emerald-500/[0.02] blur-xl group-hover:bg-emerald-500/[0.04] transition-all duration-500"></div>
-          <div class="flex items-center gap-3">
-            <span 
-              class="w-3.5 h-3.5 rounded-full relative flex"
-              classList={{
-                "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.6)]": health.data?.ok === true,
-                "bg-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.6)] animate-pulse": health.data?.ok === false,
-                "bg-slate-500": !health.data,
-              }}
-            >
-              {health.data?.ok && <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
-            </span>
-            <div
-              class="text-2xl font-bold tracking-tight"
-              classList={{
-                "text-emerald-400": health.data?.ok === true,
-                "text-rose-400": health.data?.ok === false,
-                "text-slate-400": !health.data,
-              }}
-            >
-              {health.isLoading ? "…" : health.data?.ok ? t("common.online") : t("common.offline")}
-            </div>
-          </div>
-        </Card>
-        
-        <Card title={t("dashboard.wfmUserTitle")} class="relative overflow-hidden group">
-          <div class="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-teal-500/[0.02] blur-xl group-hover:bg-teal-500/[0.04] transition-all duration-500"></div>
-          <div class="flex items-center gap-2">
-            <svg class="w-5 h-5 text-teal-400/80" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+    <div class="space-y-7">
+      <PageHeader
+        title={t("nav.dashboard")}
+        pulse
+        eyebrow={
+          <span>
+            warframe.market · {health.data?.ok ? t("common.online") : t("common.offline")}
+          </span>
+        }
+      />
+
+      {/* Key metrics */}
+      <section class="grid grid-cols-1 sm:grid-cols-3 gap-[18px]">
+        <StatTile
+          label={t("dashboard.healthTitle")}
+          positive={health.data?.ok === true}
+          icon={
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M3 12h4l2 6 4-12 2 6h6"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
-            <div class="text-xl font-bold font-mono tracking-wide text-teal-300">
-              {health.data?.wfm_username ?? t("common.dash")}
-            </div>
-          </div>
-        </Card>
-        
-        <Card title={t("dashboard.alecaTitle")} class="relative overflow-hidden group">
-          <div class="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-indigo-500/[0.02] blur-xl group-hover:bg-indigo-500/[0.04] transition-all duration-500"></div>
-          <div class="flex items-center gap-2">
-            <svg class="w-5 h-5 text-indigo-400/80" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+          }
+          value={
+            health.isLoading ? "…" : health.data?.ok ? t("common.online") : t("common.offline")
+          }
+        />
+        <StatTile
+          label={t("dashboard.wfmUserTitle")}
+          icon={
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 12a4 4 0 100-8 4 4 0 000 8z" stroke="currentColor" stroke-width="1.6" />
+              <path
+                d="M4 21a8 8 0 0116 0"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+              />
             </svg>
-            <div class="text-xl font-bold font-mono tracking-wide text-indigo-300">
-              v{health.data?.aleca_version ?? t("common.dash")}
-            </div>
-          </div>
-        </Card>
+          }
+          value={health.data?.wfm_username ?? t("common.dash")}
+        />
+        <StatTile
+          label={t("dashboard.alecaTitle")}
+          icon={
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M3 7h18v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+                stroke="currentColor"
+                stroke-width="1.6"
+              />
+              <path
+                d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"
+                stroke="currentColor"
+                stroke-width="1.6"
+              />
+            </svg>
+          }
+          value={`v${health.data?.aleca_version ?? t("common.dash")}`}
+        />
       </section>
 
-      {/* Main Lists & Telemetries Grid */}
-      <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* WTB Matches Card */}
-        <Card title={t("dashboard.wtbTitle")} subtitle={t("dashboard.wtbSubtitle")} class="shadow-md">
-          <Show when={!wtb.isLoading} fallback={<div class="text-slate-500 text-sm font-medium animate-pulse">{t("common.loading")}</div>}>
+      {/* Lists */}
+      <section class="grid grid-cols-1 lg:grid-cols-3 gap-[18px]">
+        {/* WTB matches */}
+        <div class="panel">
+          <div class="panel-head">
+            <div class="min-w-0">
+              <div class="panel-title">{t("dashboard.wtbTitle")}</div>
+              <div class="panel-sub">{t("dashboard.wtbSubtitle")}</div>
+            </div>
+          </div>
+          <div class="panel-body">
             <Show
-              when={(wtb.data?.items ?? []).length > 0}
-              fallback={<EmptyState title={t("dashboard.wtbEmpty")} hint={t("dashboard.wtbEmptyHint")} />}
+              when={!wtb.isLoading}
+              fallback={<div class="p-3 text-sm text-dim animate-pulse">{t("common.loading")}</div>}
             >
-              <ul class="space-y-3">
+              <Show
+                when={(wtb.data?.items ?? []).length > 0}
+                fallback={
+                  <EmptyState title={t("dashboard.wtbEmpty")} hint={t("dashboard.wtbEmptyHint")} />
+                }
+              >
                 <For each={wtb.data!.items.slice(0, 5)}>
                   {(m) => (
-                    <li class="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/[0.01] hover:bg-white/[0.02] border border-white/[0.02] hover:border-white/[0.05] transition-all duration-300 hover:-translate-y-0.5">
-                      <div class="min-w-0">
-                        <div class="text-[14px] font-semibold text-slate-100 truncate">{m.item_name}</div>
-                        <div class="text-[11px] text-slate-500 font-mono flex items-center gap-1.5 mt-0.5">
-                          <span class="text-teal-400 font-bold">{m.buyer}</span>
+                    <div class="row">
+                      <ItemThumb src={thumbOf(m.slug)} name={m.item_name} size={38} />
+                      <div class="item-main flex-1 min-w-0">
+                        <div class="text-[14px] font-semibold text-fg truncate">{m.item_name}</div>
+                        <div class="text-[11px] text-dim flex items-center gap-1.5 mt-0.5">
+                          <span class="text-brand-soft font-semibold">{m.buyer}</span>
                           <span>·</span>
-                          <span class="px-1.5 py-0.2 rounded bg-slate-950/40 text-[9px] uppercase border border-slate-800/50">{m.buyer_status}</span>
-                          <span>·</span>
-                          <span>{t("dashboard.rep")} {fmtInt(m.buyer_reputation)}</span>
+                          <span>
+                            {t("dashboard.rep")} {fmtInt(m.buyer_reputation)}
+                          </span>
                         </div>
                       </div>
-                      <Badge variant="good">{fmtPlat(m.offer_price)}</Badge>
-                    </li>
+                      <div class="flex flex-col items-end gap-1.5">
+                        <span class="num font-bold text-[15px] text-fg">
+                          {fmtPlat(m.offer_price)}
+                        </span>
+                        <span class={`chip ${m.buyer_status === "ingame" ? "ingame" : "online"}`}>
+                          <span class="dot" />
+                          {m.buyer_status}
+                        </span>
+                      </div>
+                    </div>
                   )}
                 </For>
-              </ul>
+              </Show>
             </Show>
-          </Show>
-        </Card>
+          </div>
+        </div>
 
-        {/* Profit Sets Card */}
-        <Card title={t("dashboard.setsTitle")} subtitle={t("dashboard.setsSubtitle")} class="shadow-md">
-          <Show when={!sets.isLoading} fallback={<div class="text-slate-500 text-sm font-medium animate-pulse">{t("common.loading")}</div>}>
+        {/* Profitable sets */}
+        <div class="panel">
+          <div class="panel-head">
+            <div class="min-w-0">
+              <div class="panel-title">{t("dashboard.setsTitle")}</div>
+              <div class="panel-sub">{t("dashboard.setsSubtitle")}</div>
+            </div>
+          </div>
+          <div class="panel-body">
             <Show
-              when={(sets.data?.items ?? []).length > 0}
-              fallback={<EmptyState title={t("dashboard.setsEmpty")} hint={t("dashboard.setsEmptyHint")} />}
+              when={!sets.isLoading}
+              fallback={<div class="p-3 text-sm text-dim animate-pulse">{t("common.loading")}</div>}
             >
-              <ul class="space-y-3">
+              <Show
+                when={(sets.data?.items ?? []).length > 0}
+                fallback={
+                  <EmptyState
+                    title={t("dashboard.setsEmpty")}
+                    hint={t("dashboard.setsEmptyHint")}
+                  />
+                }
+              >
                 <For each={sets.data!.items.slice(0, 5)}>
                   {(s) => (
-                    <li class="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/[0.01] hover:bg-white/[0.02] border border-white/[0.02] hover:border-white/[0.05] transition-all duration-300 hover:-translate-y-0.5">
-                      <div class="text-[14px] font-semibold text-slate-100 truncate">{s.set_name}</div>
-                      <Badge variant="good">+{fmtPlat(s.profit)}</Badge>
-                    </li>
+                    <div class="row">
+                      <ItemThumb src={thumbOf(s.set_slug)} name={s.set_name} size={38} />
+                      <div class="flex-1 min-w-0 text-[14px] font-semibold text-fg truncate">
+                        {s.set_name}
+                      </div>
+                      <span class="margin-pill">+{fmtPlat(s.profit)}</span>
+                    </div>
                   )}
                 </For>
-              </ul>
+              </Show>
             </Show>
-          </Show>
-        </Card>
+          </div>
+        </div>
 
-        {/* Relist Nudges Card */}
-        <Card title={t("dashboard.nudgesTitle")} subtitle={t("dashboard.nudgesSubtitle")} class="shadow-md">
-          <Show when={!nudges.isLoading} fallback={<div class="text-slate-500 text-sm font-medium animate-pulse">{t("common.loading")}</div>}>
+        {/* Relist nudges */}
+        <div class="panel">
+          <div class="panel-head">
+            <div class="min-w-0">
+              <div class="panel-title">{t("dashboard.nudgesTitle")}</div>
+              <div class="panel-sub">{t("dashboard.nudgesSubtitle")}</div>
+            </div>
+          </div>
+          <div class="panel-body">
             <Show
-              when={(nudges.data?.items ?? []).length > 0}
-              fallback={<EmptyState title={t("dashboard.nudgesEmpty")} hint={t("dashboard.nudgesEmptyHint")} />}
+              when={!nudges.isLoading}
+              fallback={<div class="p-3 text-sm text-dim animate-pulse">{t("common.loading")}</div>}
             >
-              <ul class="space-y-3">
-                <For each={nudges.data!.items.slice(0, 5)}>
-                  {(n) => (
-                    <li class="p-3.5 rounded-2xl bg-white/[0.01] hover:bg-white/[0.02] border border-white/[0.02] hover:border-white/[0.05] transition-all duration-300 hover:-translate-y-0.5">
-                      <div class="flex items-center justify-between gap-3">
-                        <span class="text-[14px] font-semibold text-slate-100 truncate">{n.item_name}</span>
-                        <span class="font-mono text-xs font-bold text-slate-400 bg-slate-950/40 px-2 py-0.5 rounded-lg border border-slate-800/40">{fmtPlat(n.your_price)}</span>
+              <Show
+                when={(nudges.data?.items ?? []).length > 0}
+                fallback={
+                  <EmptyState
+                    title={t("dashboard.nudgesEmpty")}
+                    hint={t("dashboard.nudgesEmptyHint")}
+                  />
+                }
+              >
+                <div class="px-1 py-1.5 space-y-1.5">
+                  <For each={nudges.data!.items.slice(0, 5)}>
+                    {(n) => (
+                      <div class="flex gap-3 rounded-[10px] p-3 hover:bg-white/[0.03] transition-colors">
+                        <ItemThumb src={thumbOf(n.slug)} name={n.item_name} size={38} />
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-center justify-between gap-3">
+                            <span class="text-[14px] font-semibold text-fg truncate">
+                              {n.item_name}
+                            </span>
+                            <span class="num text-xs font-semibold text-sub">
+                              {fmtPlat(n.your_price)}
+                            </span>
+                          </div>
+                          <div class="text-[11px] font-medium text-amber-300 flex items-center gap-1.5 mt-2">
+                            <svg
+                              class="w-3.5 h-3.5 text-amber-400 flex-shrink-0"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                              />
+                            </svg>
+                            <span class="truncate">{n.suggestion}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div class="text-[11px] font-medium text-amber-300 flex items-center gap-1.5 mt-2 bg-amber-500/5 border border-amber-500/10 px-2.5 py-1 rounded-xl">
-                        <svg class="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                        </svg>
-                        <span class="truncate">{n.suggestion}</span>
-                      </div>
-                    </li>
-                  )}
-                </For>
-              </ul>
+                    )}
+                  </For>
+                </div>
+              </Show>
             </Show>
-          </Show>
-        </Card>
+          </div>
+        </div>
       </section>
     </div>
   );

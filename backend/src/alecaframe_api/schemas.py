@@ -1,4 +1,5 @@
 """Pydantic response schemas for the public API."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -104,7 +105,7 @@ class ApiInfo(BaseModel):
 
 
 class OrderRow(BaseModel):
-    side: str           # "sell" | "buy"
+    side: str  # "sell" | "buy"
     price: int
     qty: int
     user: str
@@ -140,6 +141,7 @@ class OrderBookResponse(BaseModel):
 
 class ItemUseRef(BaseModel):
     """An item that uses some other item as a component in its recipe."""
+
     name: str
     unique_name: str
     count: int
@@ -149,6 +151,9 @@ class PricedItemEntry(BaseModel):
     unique_name: str
     name: str
     slug: str | None
+    # DE imageName (from cachedData) → warframestat CDN. Lets the UI show art
+    # for items WFM has no thumbnail for (e.g. whole warframes, slug=None).
+    image_name: str | None = None
     count: int | None = None
     vaulted: bool | None = None
     sell_min: int | None = None
@@ -167,6 +172,24 @@ class PricedItemListResponse(BaseModel):
     total: int
     returned: int
     items: list[PricedItemEntry]
+
+
+class ItemBaseStats(BaseModel):
+    """Base (unmodded) reference stats for one item/warframe, from WFCD."""
+
+    unique_name: str
+    category: str | None = None
+    name: str | None = None
+    mastery_req: int | None = None
+    disposition: float | None = None
+    stats: dict[str, Any] = Field(default_factory=dict)
+    source: str | None = None
+    updated_at: int | None = None
+
+
+class ItemBaseStatsListResponse(BaseModel):
+    total: int
+    items: list[ItemBaseStats]
 
 
 class SetProfitRowModel(BaseModel):
@@ -207,7 +230,7 @@ class RelistNudgeRow(BaseModel):
     your_price: int
     median: int | None
     top5: list[int]
-    suggestion: str   # e.g. "raise to 36" / "lower to 33"
+    suggestion: str  # e.g. "raise to 36" / "lower to 33"
 
 
 class RelistNudgeResponse(BaseModel):
@@ -264,9 +287,19 @@ class RivenAuctionRow(BaseModel):
     mod_rank: int | None = None
     polarity: str | None = None
     owner_name: str | None = None
-    owner_status: str | None = None         # 'ingame' | 'online' | 'offline'
+    owner_status: str | None = None  # 'ingame' | 'online' | 'offline'
     tier: str
     attributes: list[RivenAuctionAttribute] = []
+    # Weapon-aware quality score (base profile in M1). `grade`/`score` are null
+    # when `unscored` is set (no base profile, melee, etc. — reason in
+    # `unscored_reason`). Per-profile/Incarnon scores arrive in S3.
+    grade: str | None = None
+    score: int | None = None
+    unscored: bool = False
+    unscored_reason: str | None = None
+    # Quality grade crossed with market price: "steal" (S/A under median),
+    # "trap" (F over median), or null (fair / unscored). Added in S4.
+    market_signal: str | None = None
 
 
 class RivenTierStats(BaseModel):
@@ -304,8 +337,8 @@ class RivenAuctionsResponse(BaseModel):
     weapon_slug: str
     fetched_at: str
     stale: bool = False
-    tiers: dict[str, list[RivenAuctionRow]]      # 'god' | 'mid' | 'low'
-    stats: list[RivenTierStats]                  # one per tier + 'all'
+    tiers: dict[str, list[RivenAuctionRow]]  # 'god' | 'mid' | 'low'
+    stats: list[RivenTierStats]  # one per tier + 'all'
     outliers: list[RivenOutlier]
     top_attributes: list[RivenTopAttribute]
     strategies: list[RivenStrategyTip]
@@ -371,12 +404,19 @@ class FissuresResponse(BaseModel):
 class FissureMetaResponse(BaseModel):
     eras: list[str]
     mission_types: list[str]
+    planets: list[str]
+    nodes: list[str]
+    # full star-chart catalogue {planet: [node display names]} for the
+    # planet-scoped node picker; {} when the WFCD source is unreachable.
+    nodes_by_planet: dict[str, list[str]] = {}
 
 
 class FissureSubscriptionRow(BaseModel):
     id: int
     era: str | None = None
     mission_type: str | None = None
+    planet: str | None = None
+    node: str | None = None
     is_hard: bool | None = None
     is_storm: bool | None = None
     enabled: bool = True
@@ -391,6 +431,8 @@ class FissureSubscriptionsResponse(BaseModel):
 class FissureSubscriptionCreate(BaseModel):
     era: str | None = None
     mission_type: str | None = None
+    planet: str | None = None
+    node: str | None = None
     is_hard: bool | None = None
     is_storm: bool | None = None
 

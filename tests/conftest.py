@@ -1,4 +1,5 @@
 """Shared pytest fixtures."""
+
 from __future__ import annotations
 
 import json
@@ -37,7 +38,9 @@ def tmp_data_dir(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     (d / "deltas.json").write_text(
-        json.dumps({"savedCleanly": True, "previousMiscState": [], "currentDeltas": {}}),
+        json.dumps(
+            {"savedCleanly": True, "previousMiscState": [], "currentDeltas": {}}
+        ),
         encoding="utf-8",
     )
     (d / "_meta.json").write_text(

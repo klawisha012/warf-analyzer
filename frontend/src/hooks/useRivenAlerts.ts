@@ -48,7 +48,11 @@ export function useRivenAlerts(weapons: () => string[]): void {
     onCleanup(() => {
       cancelled = true;
       teardown.forEach((fn) => {
-        try { fn(); } catch { /* listener already gone */ }
+        try {
+          fn();
+        } catch {
+          /* listener already gone */
+        }
       });
     });
   });

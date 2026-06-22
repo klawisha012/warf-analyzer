@@ -1,4 +1,5 @@
 """HTTP surface for Void Fissure subscriptions + Telegram registration."""
+
 from __future__ import annotations
 
 import logging
@@ -8,12 +9,17 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, status
 
 from alecaframe_api.fissures.client import FissureClientError
-from alecaframe_api.fissures.dependencies import FissureClientDep
+from alecaframe_api.fissures.dependencies import FissureClientDep, NodeCatalogDep
 from alecaframe_api.fissures.models import Fissure
 from alecaframe_api.schemas import (
-    FissureMetaResponse, FissureRow, FissuresResponse,
-    FissureSubscriptionCreate, FissureSubscriptionRow, FissureSubscriptionsResponse,
-    TelegramChatRow, TelegramChatsResponse,
+    FissureMetaResponse,
+    FissureRow,
+    FissuresResponse,
+    FissureSubscriptionCreate,
+    FissureSubscriptionRow,
+    FissureSubscriptionsResponse,
+    TelegramChatRow,
+    TelegramChatsResponse,
 )
 from alecaframe_api.wfm.dependencies import RepoDep
 
@@ -23,10 +29,48 @@ router = APIRouter(prefix="/fissures", tags=["fissures"])
 
 ERAS = ["Lith", "Meso", "Neo", "Axi", "Requiem", "Omnia"]
 KNOWN_MISSION_TYPES = [
-    "Alchemy", "Assault", "Capture", "Defection", "Defense", "Disruption",
-    "Excavation", "Extermination", "Hijack", "Interception", "Mobile Defense",
-    "Orphix", "Rescue", "Sabotage", "Skirmish", "Spy", "Survival",
-    "Void Cascade", "Void Flood", "Volatile",
+    "Alchemy",
+    "Assault",
+    "Capture",
+    "Defection",
+    "Defense",
+    "Disruption",
+    "Excavation",
+    "Extermination",
+    "Hijack",
+    "Interception",
+    "Mobile Defense",
+    "Orphix",
+    "Rescue",
+    "Sabotage",
+    "Skirmish",
+    "Spy",
+    "Survival",
+    "Void Cascade",
+    "Void Flood",
+    "Volatile",
+]
+KNOWN_PLANETS = [
+    "Mercury",
+    "Venus",
+    "Earth",
+    "Lua",
+    "Mars",
+    "Deimos",
+    "Phobos",
+    "Ceres",
+    "Jupiter",
+    "Europa",
+    "Saturn",
+    "Uranus",
+    "Neptune",
+    "Pluto",
+    "Sedna",
+    "Eris",
+    "Void",
+    "Kuva Fortress",
+    "Zariman",
+    "Höllvania",
 ]
 
 
@@ -42,19 +86,33 @@ def _eta_seconds(expiry: str | None, now: float) -> int | None:
 
 def _to_row(f: Fissure, now: float) -> FissureRow:
     return FissureRow(
-        id=f.id, era=f.era, mission_type=f.mission_type, node=f.node,
-        planet=f.planet, enemy=f.enemy, is_hard=f.is_hard, is_storm=f.is_storm,
-        expiry=f.expiry, eta_seconds=_eta_seconds(f.expiry, now),
+        id=f.id,
+        era=f.era,
+        mission_type=f.mission_type,
+        node=f.node,
+        planet=f.planet,
+        enemy=f.enemy,
+        is_hard=f.is_hard,
+        is_storm=f.is_storm,
+        expiry=f.expiry,
+        eta_seconds=_eta_seconds(f.expiry, now),
     )
 
 
 def _norm_sub(r: dict) -> dict:
     def _b(v) -> bool | None:
         return None if v is None else bool(v)
+
     return {
-        "id": r["id"], "era": r["era"], "mission_type": r["mission_type"],
-        "is_hard": _b(r["is_hard"]), "is_storm": _b(r["is_storm"]),
-        "enabled": bool(r["enabled"]), "created_at": r["created_at"],
+        "id": r["id"],
+        "era": r["era"],
+        "mission_type": r["mission_type"],
+        "planet": r["planet"],
+        "node": r["node"],
+        "is_hard": _b(r["is_hard"]),
+        "is_storm": _b(r["is_storm"]),
+        "enabled": bool(r["enabled"]),
+        "created_at": r["created_at"],
     }
 
 
@@ -70,17 +128,33 @@ async def list_fissures(client: FissureClientDep) -> FissuresResponse:
     return FissuresResponse(total=len(rows), items=rows)
 
 
-@router.get("/meta", response_model=FissureMetaResponse,
-            summary="All possible fissure axes (eras + mission types)")
-async def fissures_meta(client: FissureClientDep) -> FissureMetaResponse:
-    live: set[str] = set()
+@router.get(
+    "/meta",
+    response_model=FissureMetaResponse,
+    summary="All fissure axes (eras, mission types, planets, live nodes)",
+)
+async def fissures_meta(
+    client: FissureClientDep, catalog: NodeCatalogDep
+) -> FissureMetaResponse:
+    live_missions: set[str] = set()
+    live_planets: set[str] = set()
+    live_nodes: set[str] = set()
     try:
         for f in await client.get_fissures():
-            live.add(f.mission_type)
+            live_missions.add(f.mission_type)
+            if f.planet:
+                live_planets.add(f.planet)
+            if f.node:
+                live_nodes.add(f.node)
     except FissureClientError:
         pass
+    nodes_by_planet = await catalog.get()
     return FissureMetaResponse(
-        eras=ERAS, mission_types=sorted(set(KNOWN_MISSION_TYPES) | live),
+        eras=ERAS,
+        mission_types=sorted(set(KNOWN_MISSION_TYPES) | live_missions),
+        planets=sorted(set(KNOWN_PLANETS) | live_planets | set(nodes_by_planet)),
+        nodes=sorted(live_nodes),
+        nodes_by_planet=nodes_by_planet,
     )
 
 
@@ -91,12 +165,22 @@ async def list_subscriptions(repo: RepoDep) -> FissureSubscriptionsResponse:
     return FissureSubscriptionsResponse(total=len(items), items=items)
 
 
-@router.post("/subscriptions", response_model=FissureSubscriptionsResponse,
-             status_code=status.HTTP_201_CREATED)
-async def add_subscription(req: FissureSubscriptionCreate, repo: RepoDep) -> FissureSubscriptionsResponse:
+@router.post(
+    "/subscriptions",
+    response_model=FissureSubscriptionsResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_subscription(
+    req: FissureSubscriptionCreate, repo: RepoDep
+) -> FissureSubscriptionsResponse:
     await repo.add_fissure_subscription(
-        era=req.era or None, mission_type=req.mission_type or None,
-        is_hard=req.is_hard, is_storm=req.is_storm, ts=int(time.time()),
+        era=req.era or None,
+        mission_type=req.mission_type or None,
+        planet=req.planet or None,
+        node=req.node or None,
+        is_hard=req.is_hard,
+        is_storm=req.is_storm,
+        ts=int(time.time()),
     )
     rows = await repo.list_fissure_subscriptions()
     items = [FissureSubscriptionRow(**_norm_sub(r)) for r in rows]
@@ -116,6 +200,7 @@ _bot_username_cache: dict[str, str | None] = {}
 async def _bot_username() -> str | None:
     """Bot's @username via Telegram getMe, cached (it never changes at runtime)."""
     from alecaframe_api.main import telegram_client  # noqa: PLC0415
+
     if telegram_client is None:
         return None
     if "v" in _bot_username_cache:
@@ -133,23 +218,28 @@ async def _bot_username() -> str | None:
 @router.get("/telegram/chats", response_model=TelegramChatsResponse)
 async def telegram_chats(repo: RepoDep) -> TelegramChatsResponse:
     from alecaframe_api.config import get_settings  # noqa: PLC0415
+
     rows = await repo.list_telegram_chats()
     items = [TelegramChatRow(**r) for r in rows]
     return TelegramChatsResponse(
         bot_enabled=bool(get_settings().tg_api_key),
         bot_username=await _bot_username(),
-        total=len(items), items=items,
+        total=len(items),
+        items=items,
     )
 
 
 @router.post("/telegram/test")
 async def telegram_test(repo: RepoDep) -> dict:
     from alecaframe_api.main import telegram_client  # noqa: PLC0415
+
     if telegram_client is None:
         raise HTTPException(503, "telegram disabled (TG_API_KEY not set)")
     chats = await repo.list_telegram_chats()
     sent = 0
     for chat in chats:
-        if await telegram_client.send_message(int(chat["chat_id"]), "🔔 Тест: уведомления о разрывах работают."):
+        if await telegram_client.send_message(
+            int(chat["chat_id"]), "🔔 Тест: уведомления о разрывах работают."
+        ):
             sent += 1
     return {"sent": sent, "chats": len(chats)}

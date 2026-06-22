@@ -47,6 +47,22 @@ CREATE TABLE IF NOT EXISTS wfm_items (
   updated_at INTEGER
 );
 
+-- Static reference: base (unmodded) stats for every item & warframe, sourced
+-- from WFCD warframe-items and keyed by DE uniqueName (joins to inventory /
+-- wfm_items). Heterogeneous per-category stats live in stats_json; a few
+-- common fields are promoted for filtering.
+CREATE TABLE IF NOT EXISTS item_base_stats (
+  unique_name TEXT PRIMARY KEY,
+  category    TEXT,
+  name        TEXT,
+  mastery_req INTEGER,
+  disposition REAL,
+  stats_json  TEXT NOT NULL,
+  source      TEXT NOT NULL DEFAULT 'wfcd',
+  updated_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_item_base_stats_cat ON item_base_stats(category);
+
 CREATE TABLE IF NOT EXISTS set_compositions (
   set_slug TEXT,
   part_slug TEXT,
@@ -103,6 +119,8 @@ CREATE TABLE IF NOT EXISTS fissure_subscription (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   era          TEXT,            -- NULL = any
   mission_type TEXT,            -- NULL = any
+  planet       TEXT,            -- NULL = any (exact match)
+  node         TEXT,            -- NULL = any (case-insensitive substring)
   is_hard      INTEGER,         -- 0 | 1 | NULL(any)
   is_storm     INTEGER,         -- 0 | 1 | NULL(any)
   enabled      INTEGER NOT NULL DEFAULT 1,
