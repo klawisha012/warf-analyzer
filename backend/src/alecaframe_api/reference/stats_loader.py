@@ -7,10 +7,12 @@ and upsert it into the `item_base_stats` table.
 
 Data: https://github.com/WFCD/warframe-items (MIT). Factual game stats.
 """
+
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import httpx
 
@@ -30,6 +32,7 @@ def _common(it: dict[str, Any]) -> dict[str, Any]:
 
 # ----- per-category normalizers (it -> stats dict) -------------------------
 
+
 def _norm_frame(it: dict[str, Any]) -> dict[str, Any]:
     return {
         "health": _r(it.get("health")),
@@ -39,7 +42,9 @@ def _norm_frame(it: dict[str, Any]) -> dict[str, Any]:
         "sprint_speed": _r(it.get("sprintSpeed")),
         "polarities": it.get("polarities") or [],
         "aura": it.get("aura"),
-        "abilities": [a.get("name") for a in (it.get("abilities") or []) if a.get("name")],
+        "abilities": [
+            a.get("name") for a in (it.get("abilities") or []) if a.get("name")
+        ],
         "is_prime": it.get("isPrime"),
     }
 
@@ -113,7 +118,8 @@ WFCD_FILES: tuple[tuple[str, str, Callable[[dict[str, Any]], dict[str, Any]]], .
 
 
 def build_rows(
-    category: str, items: list[dict[str, Any]],
+    category: str,
+    items: list[dict[str, Any]],
     normalizer: Callable[[dict[str, Any]], dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Pure transform (no network) — used directly by tests."""
@@ -123,15 +129,17 @@ def build_rows(
         if not u:
             continue
         c = _common(it)
-        out.append({
-            "unique_name": u,
-            "category": category,
-            "name": c["name"],
-            "mastery_req": c["mastery_req"],
-            "disposition": _r(it.get("disposition")),
-            "stats": normalizer(it),
-            "source": "wfcd",
-        })
+        out.append(
+            {
+                "unique_name": u,
+                "category": category,
+                "name": c["name"],
+                "mastery_req": c["mastery_req"],
+                "disposition": _r(it.get("disposition")),
+                "stats": normalizer(it),
+                "source": "wfcd",
+            }
+        )
     return out
 
 

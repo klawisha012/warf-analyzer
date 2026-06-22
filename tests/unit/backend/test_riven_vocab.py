@@ -6,6 +6,7 @@ that snapshot MUST resolve to a known class in STAT_CLASS. If WFM renames or
 adds an attribute, this test goes red — surfacing the gap loudly instead of
 silently zero-weighting a stat in production.
 """
+
 from __future__ import annotations
 
 import json

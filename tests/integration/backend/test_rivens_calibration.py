@@ -12,6 +12,7 @@ The live-pull calibration and the Incarnon-shift case (Torid base C → Incarnon
 S) land with the curated Incarnon profiles in #6. The HITL human sign-off on
 calibrated grades is delegated for the autonomous build; revisit on review.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -32,28 +33,52 @@ def _attr(name: str, value: float, positive: bool = True) -> dict:
 _CASES = [
     pytest.param(
         # Crit launcher, low disposition: a CC+CD god roll is the textbook S.
-        _weapon("Kuva Bramma", crit_chance=0.27, status_chance=0.10,
-                omega_attenuation=0.65, type="Launcher"),
-        [_attr("critical_chance", 110), _attr("critical_damage", 110),
-         _attr("zoom", -90, positive=False)],
+        _weapon(
+            "Kuva Bramma",
+            crit_chance=0.27,
+            status_chance=0.10,
+            omega_attenuation=0.65,
+            type="Launcher",
+        ),
+        [
+            _attr("critical_chance", 110),
+            _attr("critical_damage", 110),
+            _attr("zoom", -90, positive=False),
+        ],
         id="crit-kuva-bramma",
     ),
     pytest.param(
         # Status secondary: status chance + multishot + an element is the meta
         # god roll for a status weapon.
-        _weapon("Kuva Nukor", crit_chance=0.10, status_chance=0.29,
-                omega_attenuation=1.05, type="Pistol"),
-        [_attr("status_chance", 200), _attr("multishot", 110),
-         _attr("toxin_damage", 130)],
+        _weapon(
+            "Kuva Nukor",
+            crit_chance=0.10,
+            status_chance=0.29,
+            omega_attenuation=1.05,
+            type="Pistol",
+        ),
+        [
+            _attr("status_chance", 200),
+            _attr("multishot", 110),
+            _attr("toxin_damage", 130),
+        ],
         id="status-kuva-nukor",
     ),
     pytest.param(
         # Crit rifle, low disposition: CC + CD + multishot (full weight on a
         # rifle, unlike a launcher) is the meta S roll.
-        _weapon("Soma", crit_chance=0.30, status_chance=0.10,
-                omega_attenuation=0.70, type="Rifle"),
-        [_attr("critical_chance", 120), _attr("critical_damage", 120),
-         _attr("multishot", 120)],
+        _weapon(
+            "Soma",
+            crit_chance=0.30,
+            status_chance=0.10,
+            omega_attenuation=0.70,
+            type="Rifle",
+        ),
+        [
+            _attr("critical_chance", 120),
+            _attr("critical_damage", 120),
+            _attr("multishot", 120),
+        ],
         id="crit-soma",
     ),
 ]

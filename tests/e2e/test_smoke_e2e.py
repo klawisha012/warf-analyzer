@@ -3,13 +3,13 @@
 Run manually after `./scripts/start-stack.ps1`:
     uv run pytest tests/test_smoke_e2e.py -m e2e -v
 """
+
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
-import pytest
 import httpx
+import pytest
 
 from tests import REPO_ROOT
 
@@ -65,7 +65,8 @@ def test_centrifugo_health() -> None:
 def test_rabbitmq_management() -> None:
     r = httpx.get(
         "http://127.0.0.1:15672/api/overview",
-        auth=("aleca", "aleca-local"), timeout=3,
+        auth=("aleca", "aleca-local"),
+        timeout=3,
     )
     assert r.status_code == 200
     assert "rabbitmq_version" in r.json()
@@ -76,7 +77,7 @@ def test_wfm_items_listing() -> None:
     r = httpx.get("http://127.0.0.1:8765/wfm/items", timeout=10)
     assert r.status_code == 200
     body = r.json()
-    assert body["total"] > 1000   # WFM catalogue has thousands of slugs
+    assert body["total"] > 1000  # WFM catalogue has thousands of slugs
 
 
 @pytest.mark.e2e

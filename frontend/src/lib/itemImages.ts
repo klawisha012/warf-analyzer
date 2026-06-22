@@ -34,9 +34,9 @@ export function warframestatImg(imageName: string | null | undefined): string | 
 export function useItemThumbs(): (slug: string | null | undefined) => string | null {
   const q = createQuery(() => ({
     queryKey: keys.wfmItems(),
-    queryFn:  fetchers.wfmItems,
+    queryFn: fetchers.wfmItems,
     staleTime: 24 * 60 * 60 * 1000,
-    gcTime:    24 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
   }));
   const map = createMemo(() => {
     const m = new Map<string, string>();
@@ -46,7 +46,8 @@ export function useItemThumbs(): (slug: string | null | undefined) => string | n
     }
     return m;
   });
-  return (slug) => (slug ? map().get(slug) ?? null : null);
+  // eslint-disable-next-line solid/reactivity -- returned closure is always called inside JSX or a tracked scope by callers
+  return (slug) => (slug ? (map().get(slug) ?? null) : null);
 }
 
 /** First letters of up to two significant words → monogram fallback (e.g. "Loki Prime" → "LP"). */
@@ -56,5 +57,10 @@ export function monogram(name: string): string {
     .split(/\s+/)
     .filter(Boolean);
   const pick = words.length >= 2 ? words.slice(0, 2) : [name];
-  return pick.map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 2) || "?";
+  return (
+    pick
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("")
+      .slice(0, 2) || "?"
+  );
 }

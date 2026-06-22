@@ -2,6 +2,7 @@
 
 A `None` field on the subscription means "any" for that axis. A fissure
 matches iff every *specified* (non-None) axis is equal."""
+
 from __future__ import annotations
 
 from alecaframe_api.fissures.models import Fissure, Subscription

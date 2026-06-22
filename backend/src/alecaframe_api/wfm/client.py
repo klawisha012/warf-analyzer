@@ -9,6 +9,7 @@ Owns:
 All public methods land in `wfm/client.py` part 2 (next task). This task adds
 the `_request` plumbing and types only.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -16,8 +17,9 @@ import base64
 import json
 import logging
 import time as _time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 import httpx
 from aiolimiter import AsyncLimiter
@@ -28,10 +30,10 @@ from alecaframe_api.wfm.slugs import ItemRef
 log = logging.getLogger("alecaframe.wfm.client")
 
 # Per-resource TTLs (seconds). Adjust if WFM rate limits or product needs change.
-_TTL_ITEMS = 24 * 3600       # 24h — catalogue is stable
-_TTL_ORDERS = 60             # 60s — order book churn
-_TTL_PROFILE = 300           # 5min
-_TTL_STATISTICS = 300        # 5min
+_TTL_ITEMS = 24 * 3600  # 24h — catalogue is stable
+_TTL_ORDERS = 60  # 60s — order book churn
+_TTL_PROFILE = 300  # 5min
+_TTL_STATISTICS = 300  # 5min
 
 
 TokenProvider = Callable[[], Awaitable[str]]
@@ -60,10 +62,14 @@ class WFMClient:
     # parallel misses.
     _cached_token: str | None = field(default=None, init=False, repr=False)
     _token_expires_at: float = field(default=0.0, init=False, repr=False)
-    _token_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
+    _token_lock: asyncio.Lock = field(
+        default_factory=asyncio.Lock, init=False, repr=False
+    )
 
     def __post_init__(self) -> None:
-        self._limiter = AsyncLimiter(max_rate=self.rate_limit_per_second, time_period=1.0)
+        self._limiter = AsyncLimiter(
+            max_rate=self.rate_limit_per_second, time_period=1.0
+        )
 
     @property
     def _cache(self) -> Cache:
@@ -133,7 +139,9 @@ class WFMClient:
             }
             async with self._limiter:
                 client = await self._client()
-                resp = await client.request(method, path, headers=headers, params=params)
+                resp = await client.request(
+                    method, path, headers=headers, params=params
+                )
                 resp.raise_for_status()
                 payload: dict[str, Any] = resp.json()
         except Exception as e:
@@ -142,7 +150,9 @@ class WFMClient:
             if stale is not None:
                 stale = {**stale, "_stale": True}
                 return stale
-            raise WFMError(f"{method} {path} failed and no stale cache available: {e}") from e
+            raise WFMError(
+                f"{method} {path} failed and no stale cache available: {e}"
+            ) from e
 
         await self.cache.set_json(cache_key, payload, ttl_seconds=cache_ttl)
         return payload
@@ -158,14 +168,19 @@ class WFMClient:
         not the bulk listing.
         """
         payload = await self._request(
-            "GET", "/items",
+            "GET",
+            "/items",
             cache_key="items",
             cache_ttl=_TTL_ITEMS,
         )
         items = payload.get("data") or []
         out: list[ItemRef] = []
         for it in items:
-            en = (it.get("i18n") or {}).get(self.language) or (it.get("i18n") or {}).get("en") or {}
+            en = (
+                (it.get("i18n") or {}).get(self.language)
+                or (it.get("i18n") or {}).get("en")
+                or {}
+            )
             out.append(
                 ItemRef(
                     slug=it["slug"],
@@ -206,7 +221,9 @@ class WFMClient:
             fresh=fresh,
         )
 
-    async def get_profile(self, username: str, *, fresh: bool = False) -> dict[str, Any]:
+    async def get_profile(
+        self, username: str, *, fresh: bool = False
+    ) -> dict[str, Any]:
         """Fetch the authenticated user's profile.
 
         v2 dropped the public `/profile/{username}` route — `/v2/me` is the
@@ -224,7 +241,9 @@ class WFMClient:
             fresh=fresh,
         )
 
-    async def get_profile_orders(self, username: str, *, fresh: bool = False) -> dict[str, Any]:
+    async def get_profile_orders(
+        self, username: str, *, fresh: bool = False
+    ) -> dict[str, Any]:
         """Fetch the authenticated user's listed orders (was profile/{user}/orders).
 
         v2 endpoint: `/v2/orders/my` (NOT `/v2/me/orders` — that path 404s).

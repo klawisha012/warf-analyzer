@@ -59,7 +59,9 @@ export default function ValuationCard(props: ValuationCardProps) {
             {(s) => (
               <div class="flex flex-col">
                 <span class="text-[10px] text-dim uppercase tracking-wider">{s.label}</span>
-                <span class={`num text-[13px] font-semibold ${TONE[s.tone ?? "sub"]}`}>{s.value}</span>
+                <span class={`num text-[13px] font-semibold ${TONE[s.tone ?? "sub"]}`}>
+                  {s.value}
+                </span>
               </div>
             )}
           </For>
@@ -69,7 +71,9 @@ export default function ValuationCard(props: ValuationCardProps) {
       <Show when={props.primary}>
         <div class="text-right shrink-0 pl-2">
           <div class="num text-[20px] font-bold text-mint leading-none">{props.primary!.value}</div>
-          <div class="text-[10px] text-dim uppercase tracking-wider mt-1.5">{props.primary!.label}</div>
+          <div class="text-[10px] text-dim uppercase tracking-wider mt-1.5">
+            {props.primary!.label}
+          </div>
         </div>
       </Show>
     </article>

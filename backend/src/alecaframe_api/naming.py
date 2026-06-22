@@ -6,6 +6,7 @@ AlecaFrame ships a static JSON catalogue at
 Each *.json there is a list (or dict) of items with `uniqueName` and `name`
 fields. We load all of them lazily at first use.
 """
+
 from __future__ import annotations
 
 import json
@@ -76,7 +77,11 @@ class NameResolver:
                     log.warning("can't parse %s: %s", path, e)
                     continue
                 self._index(raw, category)
-            log.info("name resolver: %d entries from %s", len(self._table), self.cached_json_dir)
+            log.info(
+                "name resolver: %d entries from %s",
+                len(self._table),
+                self.cached_json_dir,
+            )
             self._loaded = True
 
     def _index(self, raw: Any, category: str) -> None:
@@ -138,7 +143,9 @@ class NameResolver:
                 return v
         return None
 
-    def enrich(self, items: list[dict[str, Any]], *, key: str = "ItemType") -> list[dict[str, Any]]:
+    def enrich(
+        self, items: list[dict[str, Any]], *, key: str = "ItemType"
+    ) -> list[dict[str, Any]]:
         """Return new list with `name`, `category`, `ducats` added per item."""
         self._ensure_loaded()
         out: list[dict[str, Any]] = []

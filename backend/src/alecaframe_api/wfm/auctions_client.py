@@ -10,13 +10,15 @@ two clients are intentionally NOT siblings of a shared base class — the
 parallel structure is shallow enough that a base class would do more harm
 than good (different response shapes, different TTLs, different paths).
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import time as _time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 import httpx
 from aiolimiter import AsyncLimiter
@@ -25,9 +27,9 @@ from alecaframe_api.infra.cache import Cache
 
 log = logging.getLogger("alecaframe.wfm.auctions_client")
 
-_TTL_RIVEN_ITEMS = 24 * 3600     # catalogue of riven-capable weapons rarely changes
-_TTL_AUCTIONS_SEARCH = 60        # auction list churn — refresh fast
-_TTL_AUCTION_ENTRY = 120         # per-auction detail
+_TTL_RIVEN_ITEMS = 24 * 3600  # catalogue of riven-capable weapons rarely changes
+_TTL_AUCTIONS_SEARCH = 60  # auction list churn — refresh fast
+_TTL_AUCTION_ENTRY = 120  # per-auction detail
 
 
 TokenProvider = Callable[[], Awaitable[str]]
@@ -51,14 +53,20 @@ class WFMAuctionClient:
     _http: httpx.AsyncClient | None = field(default=None, init=False, repr=False)
     _cached_token: str | None = field(default=None, init=False, repr=False)
     _token_expires_at: float = field(default=0.0, init=False, repr=False)
-    _token_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
+    _token_lock: asyncio.Lock = field(
+        default_factory=asyncio.Lock, init=False, repr=False
+    )
 
     def __post_init__(self) -> None:
-        self._limiter = AsyncLimiter(max_rate=self.rate_limit_per_second, time_period=1.0)
+        self._limiter = AsyncLimiter(
+            max_rate=self.rate_limit_per_second, time_period=1.0
+        )
 
     async def _client(self) -> httpx.AsyncClient:
         if self._http is None:
-            self._http = httpx.AsyncClient(base_url=self.base_url, timeout=self.request_timeout)
+            self._http = httpx.AsyncClient(
+                base_url=self.base_url, timeout=self.request_timeout
+            )
         return self._http
 
     async def aclose(self) -> None:
@@ -84,8 +92,13 @@ class WFMAuctionClient:
             return token
 
     async def _request(
-        self, method: str, path: str, *,
-        cache_key: str, cache_ttl: int, fresh: bool = False,
+        self,
+        method: str,
+        path: str,
+        *,
+        cache_key: str,
+        cache_ttl: int,
+        fresh: bool = False,
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if not fresh:
@@ -103,15 +116,21 @@ class WFMAuctionClient:
             }
             async with self._limiter:
                 client = await self._client()
-                resp = await client.request(method, path, headers=headers, params=params)
+                resp = await client.request(
+                    method, path, headers=headers, params=params
+                )
                 resp.raise_for_status()
                 payload: dict[str, Any] = resp.json()
         except Exception as e:
-            log.warning("wfm-auctions %s %s failed: %s; trying stale fallback", method, path, e)
+            log.warning(
+                "wfm-auctions %s %s failed: %s; trying stale fallback", method, path, e
+            )
             stale = await self.cache.get_json(cache_key)
             if stale is not None:
                 return {**stale, "_stale": True}
-            raise WFMAuctionError(f"{method} {path} failed and no stale cache: {e}") from e
+            raise WFMAuctionError(
+                f"{method} {path} failed and no stale cache: {e}"
+            ) from e
 
         await self.cache.set_json(cache_key, payload, ttl_seconds=cache_ttl)
         return payload
@@ -119,7 +138,10 @@ class WFMAuctionClient:
     # ------------------------------------------------------------- typed methods
 
     async def get_riven_auctions(
-        self, weapon_slug: str, *, fresh: bool = False,
+        self,
+        weapon_slug: str,
+        *,
+        fresh: bool = False,
     ) -> list[dict[str, Any]]:
         """Return current public riven auctions for `weapon_slug`, sorted by price asc.
 
@@ -132,23 +154,32 @@ class WFMAuctionClient:
         auctions list is the last good snapshot.
         """
         payload = await self._request(
-            "GET", "/auctions/search",
+            "GET",
+            "/auctions/search",
             cache_key=f"auctions:search:{weapon_slug}",
             cache_ttl=_TTL_AUCTIONS_SEARCH,
             fresh=fresh,
-            params={"type": "riven", "weapon_url_name": weapon_slug, "sort_by": "price_asc"},
+            params={
+                "type": "riven",
+                "weapon_url_name": weapon_slug,
+                "sort_by": "price_asc",
+            },
         )
         return list((payload.get("payload") or {}).get("auctions") or [])
 
     async def get_auction_entry(
-        self, auction_id: str, *, fresh: bool = False,
+        self,
+        auction_id: str,
+        *,
+        fresh: bool = False,
     ) -> dict[str, Any]:
         """Full detail for a single auction.
 
         v1 path: `/v1/auctions/entry/{id}`. Returns `{"payload": {"auction": {...}}}`.
         """
         payload = await self._request(
-            "GET", f"/auctions/entry/{auction_id}",
+            "GET",
+            f"/auctions/entry/{auction_id}",
             cache_key=f"auctions:entry:{auction_id}",
             cache_ttl=_TTL_AUCTION_ENTRY,
             fresh=fresh,
@@ -188,7 +219,8 @@ class WFMAuctionClient:
         callers are unaffected. Cached 24h — disposition changes once or twice a year.
         """
         payload = await self._request(
-            "GET", self._v2_url("/riven/weapons"),
+            "GET",
+            self._v2_url("/riven/weapons"),
             cache_key="riven_weapons_v2",
             cache_ttl=_TTL_RIVEN_ITEMS,
             fresh=fresh,

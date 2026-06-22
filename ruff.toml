@@ -1,0 +1,14 @@
+# Single source of truth for backend/src and tests/ (both are linted from the
+# repo root: `uv run --project backend ruff check backend/src tests`).
+target-version = "py312"
+line-length = 88
+
+[lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]  # line length is enforced by `ruff format`, not the linter
+
+[lint.per-file-ignores]
+"**/__init__.py" = ["F401"]  # re-exports are intentional
+
+[lint.isort]
+known-first-party = ["alecaframe_api", "decrypt_agent", "tests"]

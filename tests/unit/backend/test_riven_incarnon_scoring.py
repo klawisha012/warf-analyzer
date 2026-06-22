@@ -1,4 +1,5 @@
 """S3b: scoring against the base + Incarnon profile set."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -10,9 +11,14 @@ from alecaframe_api.wfm.riven_scoring import build_profiles, score_riven
 def _torid_base() -> dict:
     # Base Torid: a status launcher (low crit, high status).
     return {
-        "name": "Torid", "category": "primary",
-        "stats": {"crit_chance": 0.15, "status_chance": 0.27,
-                  "type": "Launcher", "omega_attenuation": 1.30},
+        "name": "Torid",
+        "category": "primary",
+        "stats": {
+            "crit_chance": 0.15,
+            "status_chance": 0.27,
+            "type": "Launcher",
+            "omega_attenuation": 1.30,
+        },
     }
 
 
@@ -43,7 +49,7 @@ def test_crit_riven_has_real_delta_base_to_incarnon() -> None:
     res = score_riven(crit_riven, profiles)
 
     per = {ps.kind: ps for ps in res.per_profile}
-    assert per["incarnon"].score > per["base"].score          # real delta
+    assert per["incarnon"].score > per["base"].score  # real delta
     assert per["incarnon"].grade == "S"
     # Headline defaults to the Incarnon (endgame) profile.
     assert res.headline.kind == "incarnon"
@@ -52,10 +58,14 @@ def test_crit_riven_has_real_delta_base_to_incarnon() -> None:
 def test_status_riven_prefers_base_on_pure_crit_incarnon() -> None:
     # Mirror direction (profile-dependence both ways): when the Incarnon form is
     # PURE crit (negligible status), a status roll suits the base form better.
-    base = {"name": "X", "category": "primary",
-            "stats": {"crit_chance": 0.10, "status_chance": 0.30, "type": "Rifle"}}
-    pure_crit_inc = SimpleNamespace(crit_chance=0.40, status_chance=0.01,
-                                    crit_damage=3.0, weapon_type="Rifle")
+    base = {
+        "name": "X",
+        "category": "primary",
+        "stats": {"crit_chance": 0.10, "status_chance": 0.30, "type": "Rifle"},
+    }
+    pure_crit_inc = SimpleNamespace(
+        crit_chance=0.40, status_chance=0.01, crit_damage=3.0, weapon_type="Rifle"
+    )
     profiles = build_profiles(base, incarnon=pure_crit_inc)
     status_riven = [_attr("status_chance", 180), _attr("status_duration", 180)]
     per = {ps.kind: ps for ps in score_riven(status_riven, profiles).per_profile}
@@ -64,12 +74,18 @@ def test_status_riven_prefers_base_on_pure_crit_incarnon() -> None:
 
 def test_headline_epsilon_prefers_incarnon_when_close() -> None:
     # Even if base edges incarnon by a hair, the Incarnon headline wins within ε.
-    base = {"name": "X", "category": "primary",
-            "stats": {"crit_chance": 0.30, "status_chance": 0.30, "type": "Rifle"}}
-    inc = SimpleNamespace(crit_chance=0.29, status_chance=0.29,
-                          crit_damage=3.0, weapon_type="Rifle")
+    base = {
+        "name": "X",
+        "category": "primary",
+        "stats": {"crit_chance": 0.30, "status_chance": 0.30, "type": "Rifle"},
+    }
+    inc = SimpleNamespace(
+        crit_chance=0.29, status_chance=0.29, crit_damage=3.0, weapon_type="Rifle"
+    )
     profiles = build_profiles(base, incarnon=inc)
-    res = score_riven([_attr("critical_chance", 180), _attr("multishot", 180)], profiles)
+    res = score_riven(
+        [_attr("critical_chance", 180), _attr("multishot", 180)], profiles
+    )
     assert res.headline.kind == "incarnon"
 
 

@@ -2,6 +2,7 @@
 
 Webhook is intentionally NOT used — the app runs locally without a public
 HTTPS endpoint, so long-poll is the only viable inbound channel."""
+
 from __future__ import annotations
 
 import asyncio
@@ -15,7 +16,9 @@ from alecaframe_api.db.repo import Repo
 
 log = logging.getLogger("alecaframe.fissures.telegram")
 
-WELCOME_TEXT = "✅ Подписка активна. Сюда будут приходить уведомления о разрывах Бездны."
+WELCOME_TEXT = (
+    "✅ Подписка активна. Сюда будут приходить уведомления о разрывах Бездны."
+)
 
 
 class TelegramError(RuntimeError):
@@ -34,16 +37,22 @@ class TelegramClient:
     async def send_message(self, chat_id: int, text: str) -> bool:
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as c:
-                resp = await c.post(self._url("sendMessage"), json={"chat_id": chat_id, "text": text})
+                resp = await c.post(
+                    self._url("sendMessage"), json={"chat_id": chat_id, "text": text}
+                )
         except httpx.HTTPError as e:
             log.warning("telegram sendMessage failed: %s", e)
             return False
         if resp.status_code >= 400:
-            log.warning("telegram sendMessage status %d: %s", resp.status_code, resp.text[:200])
+            log.warning(
+                "telegram sendMessage status %d: %s", resp.status_code, resp.text[:200]
+            )
             return False
         return True
 
-    async def get_updates(self, *, offset: int | None = None, timeout: int = 25) -> list[dict]:
+    async def get_updates(
+        self, *, offset: int | None = None, timeout: int = 25
+    ) -> list[dict]:
         params: dict = {"timeout": timeout}
         if offset is not None:
             params["offset"] = offset
@@ -91,14 +100,18 @@ class TelegramBot:
             # first token, stripped of any @botname suffix
             if text.split()[0].split("@")[0] == "/start":
                 username = chat.get("username") or chat.get("first_name")
-                await self.repo.register_telegram_chat(chat_id=int(chat_id), username=username, ts=now)
+                await self.repo.register_telegram_chat(
+                    chat_id=int(chat_id), username=username, ts=now
+                )
                 await self.client.send_message(int(chat_id), WELCOME_TEXT)
 
     async def run(self) -> None:
         log.info("telegram bot starting (long-poll)")
         while True:
             try:
-                updates = await self.client.get_updates(offset=self._offset, timeout=self.poll_timeout)
+                updates = await self.client.get_updates(
+                    offset=self._offset, timeout=self.poll_timeout
+                )
                 await self.handle_updates(updates, now=int(time.time()))
             except asyncio.CancelledError:
                 raise

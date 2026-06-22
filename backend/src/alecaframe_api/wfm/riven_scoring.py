@@ -10,6 +10,7 @@ weapon's **display name**, not the WFM slug: WFM riven slugs do not map to the
 WFCD `uniqueName` deterministically (e.g. `torid` -> `/Lotus/Weapons/ClanTech/
 Bio/BioWeapon`). Callers pass a name-keyed index of `item_base_stats` rows.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -18,10 +19,11 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Profile:
     """One combat profile of a weapon (base form in M1; Incarnon/perk in M2)."""
-    kind: str                 # "base" | "incarnon" | "perk"
-    critness: float           # [0, 1]
-    statusness: float         # [0, 1]
-    stats: dict               # the weapon's effective base stats for this profile
+
+    kind: str  # "base" | "incarnon" | "perk"
+    critness: float  # [0, 1]
+    statusness: float  # [0, 1]
+    stats: dict  # the weapon's effective base stats for this profile
     omega_attenuation: float  # riven-disposition multiplier
 
 
@@ -72,20 +74,24 @@ STAT_CLASS: dict[str, str] = {
     "critical_chance": _CRIT,
     "critical_damage": _CRIT,
     "critical_chance_on_slide_attack": _CRIT,
-    "critical_chance_on_slide": _CRIT,        # legacy alias
+    "critical_chance_on_slide": _CRIT,  # legacy alias
     # --- archetype: status ---
     "status_chance": _STATUS,
     "status_duration": _STATUS,
     # --- universal ---
     "base_damage_/_melee_damage": _UNIVERSAL,
-    "damage": _UNIVERSAL,                      # legacy bare alias
+    "damage": _UNIVERSAL,  # legacy bare alias
     "multishot": _UNIVERSAL,
     "fire_rate_/_attack_speed": _UNIVERSAL,
-    "fire_rate": _UNIVERSAL,                   # legacy bare alias
-    "cold_damage": _UNIVERSAL, "cold": _UNIVERSAL,
-    "heat_damage": _UNIVERSAL, "heat": _UNIVERSAL,
-    "electric_damage": _UNIVERSAL, "electricity": _UNIVERSAL,
-    "toxin_damage": _UNIVERSAL, "toxin": _UNIVERSAL,
+    "fire_rate": _UNIVERSAL,  # legacy bare alias
+    "cold_damage": _UNIVERSAL,
+    "cold": _UNIVERSAL,
+    "heat_damage": _UNIVERSAL,
+    "heat": _UNIVERSAL,
+    "electric_damage": _UNIVERSAL,
+    "electricity": _UNIVERSAL,
+    "toxin_damage": _UNIVERSAL,
+    "toxin": _UNIVERSAL,
     "impact_damage": _UNIVERSAL,
     "puncture_damage": _UNIVERSAL,
     "slash_damage": _UNIVERSAL,
@@ -112,7 +118,7 @@ STAT_CLASS: dict[str, str] = {
 
 _W_ARCHETYPE = 2.0
 _W_UNIVERSAL = 1.0
-_MULTISHOT_PENALTY = 0.5   # beam/AoE multishot scales poorly → down-weighted
+_MULTISHOT_PENALTY = 0.5  # beam/AoE multishot scales poorly → down-weighted
 
 
 def _norm_stat(stat: str | None) -> str:
@@ -164,15 +170,21 @@ _NOMINAL_MAX: dict[str, float] = {
     "multishot": 180.0,
     "status_chance": 180.0,
     "status_duration": 180.0,
-    "base_damage_/_melee_damage": 165.0, "damage": 165.0,
-    "cold_damage": 180.0, "cold": 180.0,
-    "heat_damage": 180.0, "heat": 180.0,
-    "electric_damage": 180.0, "electricity": 180.0,
-    "toxin_damage": 180.0, "toxin": 180.0,
+    "base_damage_/_melee_damage": 165.0,
+    "damage": 165.0,
+    "cold_damage": 180.0,
+    "cold": 180.0,
+    "heat_damage": 180.0,
+    "heat": 180.0,
+    "electric_damage": 180.0,
+    "electricity": 180.0,
+    "toxin_damage": 180.0,
+    "toxin": 180.0,
     "impact_damage": 180.0,
     "puncture_damage": 180.0,
     "slash_damage": 180.0,
-    "fire_rate_/_attack_speed": 90.0, "fire_rate": 90.0,
+    "fire_rate_/_attack_speed": 90.0,
+    "fire_rate": 90.0,
 }
 
 
@@ -189,7 +201,11 @@ def _buff_factor(stat_count: int, has_negative: bool) -> float:
 
 
 def grade_roll_value(
-    stat: str, value: float, stat_count: int, has_negative: bool, disposition: float,
+    stat: str,
+    value: float,
+    stat_count: int,
+    has_negative: bool,
+    disposition: float,
 ) -> float:
     """How close a rolled stat is to its achievable max, in [0, 1].
 
@@ -228,8 +244,8 @@ _GRADE_CUTOFFS = (("S", 85), ("A", 70), ("B", 50), ("C", 30), ("F", 0))
 @dataclass(frozen=True)
 class ProfileScore:
     kind: str
-    score: int        # 0-100
-    grade: str        # S/A/B/C/F
+    score: int  # 0-100
+    grade: str  # S/A/B/C/F
 
 
 @dataclass(frozen=True)
@@ -237,7 +253,7 @@ class RivenScore:
     unscored: bool
     headline: ProfileScore | None
     per_profile: list[ProfileScore]
-    reason: str | None = None   # set when unscored
+    reason: str | None = None  # set when unscored
 
 
 # Gun categories the M1 engine scores. Melee (range/attack_speed/combo) needs
@@ -267,13 +283,15 @@ def build_profiles(weapon_row: dict, incarnon=None) -> list[Profile]:
     stats = weapon_row.get("stats") or {}
     dispo = stats.get("omega_attenuation") or 1.0
     if stats:
-        profiles.append(Profile(
-            kind="base",
-            critness=critness(stats),
-            statusness=statusness(stats),
-            stats=stats,
-            omega_attenuation=dispo,
-        ))
+        profiles.append(
+            Profile(
+                kind="base",
+                critness=critness(stats),
+                statusness=statusness(stats),
+                stats=stats,
+                omega_attenuation=dispo,
+            )
+        )
     if incarnon is not None:
         inc_stats = {
             "crit_chance": incarnon.crit_chance,
@@ -281,13 +299,15 @@ def build_profiles(weapon_row: dict, incarnon=None) -> list[Profile]:
             "crit_damage": getattr(incarnon, "crit_damage", None),
             "type": incarnon.weapon_type,
         }
-        profiles.append(Profile(
-            kind="incarnon",
-            critness=critness(inc_stats),
-            statusness=statusness(inc_stats),
-            stats=inc_stats,
-            omega_attenuation=dispo,
-        ))
+        profiles.append(
+            Profile(
+                kind="incarnon",
+                critness=critness(inc_stats),
+                statusness=statusness(inc_stats),
+                stats=inc_stats,
+                omega_attenuation=dispo,
+            )
+        )
     return profiles
 
 
@@ -321,7 +341,9 @@ def _score_one(attrs: list[dict], profile: Profile) -> ProfileScore:
     # this ideal and clamp to S — correct, that *is* an S roll.) A raw-damage
     # weapon (critness=statusness=0) still reaches S on its best universal roll.
     denom_n = max(1, n_pos)
-    profile_max = max(_W_UNIVERSAL, _W_ARCHETYPE * max(profile.critness, profile.statusness))
+    profile_max = max(
+        _W_UNIVERSAL, _W_ARCHETYPE * max(profile.critness, profile.statusness)
+    )
     ideal = profile_max + (denom_n - 1) * _W_UNIVERSAL
     score = int(round(100 * max(0.0, raw) / ideal))
     score = 0 if score < 0 else 100 if score > 100 else score
@@ -395,7 +417,9 @@ _TRAP_RATIO = 1.25
 
 
 def classify_market_signal(
-    grade: str | None, buyout_price: int | None, median: int | None,
+    grade: str | None,
+    buyout_price: int | None,
+    median: int | None,
 ) -> str | None:
     """Cross the quality grade with the market price.
 
@@ -404,7 +428,13 @@ def classify_market_signal(
     - "trap": junk (F) priced at/above 1.25x the market median — overpriced.
     Returns None when inputs are missing or the price is within the fair band.
     """
-    if grade is None or buyout_price is None or buyout_price <= 0 or not median or median <= 0:
+    if (
+        grade is None
+        or buyout_price is None
+        or buyout_price <= 0
+        or not median
+        or median <= 0
+    ):
         return None
     if grade in _STEAL_GRADES and buyout_price <= _STEAL_RATIO * median:
         return "steal"

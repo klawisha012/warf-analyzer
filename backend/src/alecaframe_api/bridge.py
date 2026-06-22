@@ -8,6 +8,7 @@ This module:
 - calls POST {agent_url}/refresh to ask the agent to re-decrypt
 - maintains a tiny in-memory cache so re-reads are cheap
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -27,7 +28,9 @@ class BridgeError(RuntimeError):
     """Raised when /refresh fails or files cannot be loaded."""
 
 
-def _unwrap_inventory_if_wrapped(data: dict[str, Any], *, path: Path | None = None) -> dict[str, Any]:
+def _unwrap_inventory_if_wrapped(
+    data: dict[str, Any], *, path: Path | None = None
+) -> dict[str, Any]:
     """Detect AlecaFrame's mission-completion wrapper and return the unwrapped inventory.
 
     AlecaFrame's `lastData.dat` can hold two different DE-API responses depending
@@ -61,7 +64,9 @@ def _unwrap_inventory_if_wrapped(data: dict[str, Any], *, path: Path | None = No
         return data
     log.info(
         "unwrapped mission-completion lastData wrapper: %d → %d top-level keys (from %s)",
-        len(data), len(unwrapped), path,
+        len(data),
+        len(unwrapped),
+        path,
     )
     return unwrapped
 
@@ -80,7 +85,7 @@ class AlecaBridge:
     agent_url: str
     data_dir: Path
     ttl_seconds: int = 60
-    refresh_timeout: float = 10.0   # agent's pwsh cold-load is ~5s; 10s gives headroom
+    refresh_timeout: float = 10.0  # agent's pwsh cold-load is ~5s; 10s gives headroom
 
     _lastdata: CacheEntry | None = field(default=None, init=False, repr=False)
     _deltas: CacheEntry | None = field(default=None, init=False, repr=False)

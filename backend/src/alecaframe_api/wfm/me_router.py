@@ -1,4 +1,5 @@
 """Endpoints supporting frontend real-time wiring."""
+
 from __future__ import annotations
 
 from typing import Annotated
@@ -9,7 +10,6 @@ from alecaframe_api.bridge import AlecaBridge
 from alecaframe_api.config import get_settings
 from alecaframe_api.infra.push import CentrifugoPublisher
 
-
 router = APIRouter()
 
 
@@ -17,6 +17,7 @@ def _get_bridge() -> AlecaBridge:
     # Lazy import at request time — same pattern wfm/router.py uses to break
     # the cycle with main.py.
     from alecaframe_api.main import bridge
+
     return bridge
 
 

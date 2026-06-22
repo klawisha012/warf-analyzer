@@ -1,4 +1,5 @@
 """Tests for the Redis cache wrapper."""
+
 from __future__ import annotations
 
 import pytest
@@ -10,6 +11,7 @@ from alecaframe_api.infra.cache import Cache
 async def cache() -> Cache:
     """fakeredis-backed Cache instance, isolated per test."""
     import fakeredis.aioredis
+
     client = fakeredis.aioredis.FakeRedis(decode_responses=True)
     c = Cache(client=client, key_prefix="test")
     yield c
@@ -40,6 +42,7 @@ async def test_delete(cache: Cache) -> None:
 async def test_key_prefix_isolation() -> None:
     """Two caches with different prefixes must not see each other's keys."""
     import fakeredis.aioredis
+
     client = fakeredis.aioredis.FakeRedis(decode_responses=True)
     a = Cache(client=client, key_prefix="a")
     b = Cache(client=client, key_prefix="b")

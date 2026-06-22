@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
+from alecaframe_api.fissures.models import _planet_from_node, parse_fissure
 from tests import FIXTURES_DIR
-from alecaframe_api.fissures.models import parse_fissure, _planet_from_node
 
 
 def _load() -> list[dict]:

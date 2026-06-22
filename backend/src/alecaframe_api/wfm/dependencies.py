@@ -8,6 +8,7 @@ already live as globals in `main.py`).
 This keeps the wfm/router.py clean: it just declares `Depends(get_wfm_client)`
 and gets back the singleton.
 """
+
 from __future__ import annotations
 
 from typing import Annotated
@@ -19,7 +20,6 @@ from alecaframe_api.wfm.client import WFMClient
 from alecaframe_api.wfm.price_store import PriceStore
 from alecaframe_api.wfm.sets import SetIndex
 from alecaframe_api.wfm.slugs import SlugResolver
-
 
 # Singletons populated by main.py lifespan.
 wfm_client: WFMClient | None = None

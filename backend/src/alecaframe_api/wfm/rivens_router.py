@@ -12,6 +12,7 @@ currently-cached WFM payload + the rolling 7-day historical median in
 `riven_snapshot`. The poller fills that history; the request itself does
 not write to the DB — that keeps the HTTP path read-mostly.
 """
+
 from __future__ import annotations
 
 import datetime as _dt
@@ -21,25 +22,42 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from alecaframe_api.db.repo import Repo
 from alecaframe_api.reference.incarnon_profiles import (
-    IncarnonProfile, incarnon_index, is_outdated,
+    IncarnonProfile,
+    incarnon_index,
+    is_outdated,
 )
 from alecaframe_api.schemas import (
-    RivenAuctionRow, RivenAuctionsResponse, RivenHistoryResponse,
-    RivenOutlier, RivenProfileScore, RivenSnapshotRow, RivenStrategyTip,
-    RivenTierStats, RivenTopAttribute, RivenWatchAddRequest, RivenWatchEntry,
+    RivenAuctionRow,
+    RivenAuctionsResponse,
+    RivenHistoryResponse,
+    RivenOutlier,
+    RivenProfileScore,
+    RivenSnapshotRow,
+    RivenStrategyTip,
+    RivenTierStats,
+    RivenTopAttribute,
+    RivenWatchAddRequest,
+    RivenWatchEntry,
     RivenWatchlistResponse,
 )
 from alecaframe_api.wfm.auctions_client import WFMAuctionClient, WFMAuctionError
 from alecaframe_api.wfm.dependencies import RepoDep
-from alecaframe_api.wfm.rivens_analysis import (
-    classify_tiers, compute_tier_stats, detect_outliers,
-    suggest_strategies, summarize_attributes,
-)
 from alecaframe_api.wfm.riven_scoring import (
-    Profile, build_profiles, classify_market_signal, is_scoreable_category,
-    normalize_name, resolve_weapon, score_riven,
+    Profile,
+    build_profiles,
+    classify_market_signal,
+    is_scoreable_category,
+    normalize_name,
+    resolve_weapon,
+    score_riven,
+)
+from alecaframe_api.wfm.rivens_analysis import (
+    classify_tiers,
+    compute_tier_stats,
+    detect_outliers,
+    suggest_strategies,
+    summarize_attributes,
 )
 
 log = logging.getLogger("alecaframe.wfm.rivens_router")
@@ -50,8 +68,11 @@ router = APIRouter(prefix="/rivens", tags=["rivens"])
 
 def _get_auctions_client() -> WFMAuctionClient:
     from alecaframe_api.main import auctions_client  # noqa: PLC0415
+
     if auctions_client is None:
-        raise RuntimeError("auctions_client not initialised; main.py lifespan must set it")
+        raise RuntimeError(
+            "auctions_client not initialised; main.py lifespan must set it"
+        )
     return auctions_client
 
 
@@ -63,7 +84,9 @@ def _now_iso() -> str:
 
 
 def _to_row(
-    a: dict, tier: str, *,
+    a: dict,
+    tier: str,
+    *,
     profiles: list[Profile] | None = None,
     weapon_unscored_reason: str | None = None,
     market_median: int | None = None,
@@ -72,11 +95,13 @@ def _to_row(
     owner = a.get("owner") or {}
     attrs = []
     for at in item.get("attributes") or []:
-        attrs.append({
-            "name": at.get("url_name") or at.get("name") or "",
-            "value": at.get("value") or 0,
-            "positive": bool(at.get("positive")),
-        })
+        attrs.append(
+            {
+                "name": at.get("url_name") or at.get("name") or "",
+                "value": at.get("value") or 0,
+                "positive": bool(at.get("positive")),
+            }
+        )
 
     grade = score = None
     unscored = False
@@ -121,7 +146,9 @@ def _to_row(
 
 
 async def _resolve_weapon_profiles(
-    weapon_slug: str, client: WFMAuctionClient, repo,
+    weapon_slug: str,
+    client: WFMAuctionClient,
+    repo,
 ) -> tuple[list[Profile], str | None, IncarnonProfile | None]:
     """Resolve a weapon's scoring profiles via slug -> item_name -> base stats,
     plus its curated Incarnon profile when one exists.
@@ -137,7 +164,8 @@ async def _resolve_weapon_profiles(
         # so the UI doesn't imply the weapon is unsupported.
         return [], "weapon_fetch_failed", None
     item_name = next(
-        (w.get("item_name") for w in weapons if w.get("url_name") == weapon_slug), None,
+        (w.get("item_name") for w in weapons if w.get("url_name") == weapon_slug),
+        None,
     )
     if not item_name:
         log.info("riven scoring: slug %r not in riven-weapons catalogue", weapon_slug)
@@ -145,11 +173,17 @@ async def _resolve_weapon_profiles(
     base_row = resolve_weapon(item_name, await repo.weapon_base_stats_index())
     if base_row is None:
         # Log the name-join miss so WEAPON_NAME_OVERRIDES can grow on real gaps.
-        log.info("riven scoring: no base-stats row for %r (slug %r)", item_name, weapon_slug)
+        log.info(
+            "riven scoring: no base-stats row for %r (slug %r)", item_name, weapon_slug
+        )
         return [], "no_base_profile", None
     category = base_row.get("category")
     if not is_scoreable_category(category):
-        reason = "melee_out_of_scope_m1" if category in ("melee", "arch_melee") else "category_out_of_scope_m1"
+        reason = (
+            "melee_out_of_scope_m1"
+            if category in ("melee", "arch_melee")
+            else "category_out_of_scope_m1"
+        )
         return [], reason, None
     incarnon = incarnon_index().get(normalize_name(item_name))
     profiles = build_profiles(base_row, incarnon=incarnon)
@@ -181,7 +215,12 @@ async def riven_auctions(
     repo: RepoDep,
     fresh: Annotated[bool, Query(description="Bypass cache")] = False,
     outlier_threshold: Annotated[
-        float, Query(ge=0.1, le=1.0, description="Auctions priced < threshold × historical median are flagged"),
+        float,
+        Query(
+            ge=0.1,
+            le=1.0,
+            description="Auctions priced < threshold × historical median are flagged",
+        ),
     ] = 0.8,
 ) -> RivenAuctionsResponse:
     try:
@@ -190,16 +229,22 @@ async def riven_auctions(
         raise HTTPException(503, str(e)) from e
 
     # Resolve the weapon's scoring profiles once per request (not per auction).
-    profiles, weapon_unscored_reason, incarnon = await _resolve_weapon_profiles(weapon_slug, client, repo)
+    profiles, weapon_unscored_reason, incarnon = await _resolve_weapon_profiles(
+        weapon_slug, client, repo
+    )
 
     tiers_raw = classify_tiers(auctions)
     # Overall median is the fair-price reference for the steal/trap signal (S4).
     s_all = compute_tier_stats(auctions)
     tiers_rows: dict[str, list[RivenAuctionRow]] = {
         name: [
-            _to_row(a, name, profiles=profiles,
-                    weapon_unscored_reason=weapon_unscored_reason,
-                    market_median=s_all.median)
+            _to_row(
+                a,
+                name,
+                profiles=profiles,
+                weapon_unscored_reason=weapon_unscored_reason,
+                market_median=s_all.median,
+            )
             for a in tiers_raw[name]
         ]
         for name in ("god", "mid", "low")
@@ -209,34 +254,58 @@ async def riven_auctions(
     stats_models: list[RivenTierStats] = []
     for name in ("god", "mid", "low"):
         s = compute_tier_stats(tiers_raw[name])
-        stats_models.append(RivenTierStats(
-            tier=name, count=s.count, min_price=s.min_price,
-            p25=s.p25, median=s.median, p75=s.p75, max_price=s.max_price,
-        ))
-    stats_models.append(RivenTierStats(
-        tier="all", count=s_all.count, min_price=s_all.min_price,
-        p25=s_all.p25, median=s_all.median, p75=s_all.p75, max_price=s_all.max_price,
-    ))
+        stats_models.append(
+            RivenTierStats(
+                tier=name,
+                count=s.count,
+                min_price=s.min_price,
+                p25=s.p25,
+                median=s.median,
+                p75=s.p75,
+                max_price=s.max_price,
+            )
+        )
+    stats_models.append(
+        RivenTierStats(
+            tier="all",
+            count=s_all.count,
+            min_price=s_all.min_price,
+            p25=s_all.p25,
+            median=s_all.median,
+            p75=s_all.p75,
+            max_price=s_all.max_price,
+        )
+    )
 
     # Outliers vs 7-day historical median per tier
     now = int(time.time())
     since = now - 7 * 24 * 3600
     outliers: list[RivenOutlier] = []
     import statistics as _stats
+
     for name in ("god", "mid", "low"):
-        history = await repo.riven_snapshot_history(weapon_slug=weapon_slug, tier=name, since_ts=since)
+        history = await repo.riven_snapshot_history(
+            weapon_slug=weapon_slug, tier=name, since_ts=since
+        )
         medians = [r["median"] for r in history if r["median"] is not None]
         if not medians:
             continue
         hist_median = int(_stats.median(medians))
         for o in detect_outliers(
-            tiers_raw[name], historical_median=hist_median,
-            threshold=outlier_threshold, tier=name,
+            tiers_raw[name],
+            historical_median=hist_median,
+            threshold=outlier_threshold,
+            tier=name,
         ):
-            outliers.append(RivenOutlier(
-                auction_id=o.auction_id, tier=o.tier, price=o.price,
-                historical_median=o.historical_median, discount_pct=o.discount_pct,
-            ))
+            outliers.append(
+                RivenOutlier(
+                    auction_id=o.auction_id,
+                    tier=o.tier,
+                    price=o.price,
+                    historical_median=o.historical_median,
+                    discount_pct=o.discount_pct,
+                )
+            )
 
     # Top stats (data-driven from god tier)
     top_attrs_dicts = summarize_attributes(tiers_raw["god"], top_n=5)
@@ -244,10 +313,16 @@ async def riven_auctions(
 
     # Strategy tips
     from alecaframe_api.wfm.rivens_analysis import Outlier as _O
+
     tip_dicts = suggest_strategies(
         outliers=[
-            _O(auction_id=o.auction_id, tier=o.tier, price=o.price,
-               historical_median=o.historical_median, discount_pct=o.discount_pct)
+            _O(
+                auction_id=o.auction_id,
+                tier=o.tier,
+                price=o.price,
+                historical_median=o.historical_median,
+                discount_pct=o.discount_pct,
+            )
             for o in outliers
         ],
         god_tier_count=len(tiers_raw["god"]),
@@ -260,10 +335,17 @@ async def riven_auctions(
     seen_attrs: set[str] = set()
     for a in auctions:
         for at in (a.get("item") or {}).get("attributes") or []:
-            name = (at.get("url_name") or at.get("name") or "").lower().strip().replace(" ", "_").replace("-", "_")
+            name = (
+                (at.get("url_name") or at.get("name") or "")
+                .lower()
+                .strip()
+                .replace(" ", "_")
+                .replace("-", "_")
+            )
             if name:
                 seen_attrs.add(name)
     from alecaframe_api.wfm.rivens_analysis import FATAL_NEGATIVES, HARMLESS_NEGATIVES
+
     avoid = sorted(list(FATAL_NEGATIVES.intersection(seen_attrs)))
     if not avoid:
         avoid = sorted(list(FATAL_NEGATIVES))
@@ -273,10 +355,16 @@ async def riven_auctions(
         harmless = sorted(list(HARMLESS_NEGATIVES))
 
     return RivenAuctionsResponse(
-        weapon_slug=weapon_slug, fetched_at=_now_iso(),
-        stale=False, tiers=tiers_rows, stats=stats_models,
-        outliers=outliers, top_attributes=top_attrs, strategies=strategies,
-        avoid_negatives=avoid, harmless_negatives=harmless,
+        weapon_slug=weapon_slug,
+        fetched_at=_now_iso(),
+        stale=False,
+        tiers=tiers_rows,
+        stats=stats_models,
+        outliers=outliers,
+        top_attributes=top_attrs,
+        strategies=strategies,
+        avoid_negatives=avoid,
+        harmless_negatives=harmless,
         has_incarnon_profile=incarnon is not None,
         incarnon_game_version=incarnon.game_version if incarnon else None,
         incarnon_outdated=is_outdated(incarnon) if incarnon else False,
@@ -284,7 +372,8 @@ async def riven_auctions(
 
 
 @router.get(
-    "/watchlist", response_model=RivenWatchlistResponse,
+    "/watchlist",
+    response_model=RivenWatchlistResponse,
     summary="Weapons being polled for riven auctions",
 )
 async def watchlist_list(repo: RepoDep) -> RivenWatchlistResponse:
@@ -294,11 +383,14 @@ async def watchlist_list(repo: RepoDep) -> RivenWatchlistResponse:
 
 
 @router.post(
-    "/watchlist", response_model=RivenWatchlistResponse,
+    "/watchlist",
+    response_model=RivenWatchlistResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Add a weapon to the riven watchlist (idempotent)",
 )
-async def watchlist_add(req: RivenWatchAddRequest, repo: RepoDep) -> RivenWatchlistResponse:
+async def watchlist_add(
+    req: RivenWatchAddRequest, repo: RepoDep
+) -> RivenWatchlistResponse:
     slug = req.weapon_slug.strip().lower()
     if not slug:
         raise HTTPException(400, "weapon_slug required")
@@ -320,7 +412,8 @@ async def watchlist_remove(weapon_slug: str, repo: RepoDep) -> dict:
 
 
 @router.get(
-    "/history/{weapon_slug}", response_model=RivenHistoryResponse,
+    "/history/{weapon_slug}",
+    response_model=RivenHistoryResponse,
     summary="Riven snapshot trend for one tier (default 7 days)",
 )
 async def riven_history(
@@ -330,12 +423,20 @@ async def riven_history(
     days: Annotated[int, Query(ge=1, le=90)] = 7,
 ) -> RivenHistoryResponse:
     since = int(time.time()) - days * 24 * 3600
-    rows = await repo.riven_snapshot_history(weapon_slug=weapon_slug, tier=tier, since_ts=since)
+    rows = await repo.riven_snapshot_history(
+        weapon_slug=weapon_slug, tier=tier, since_ts=since
+    )
     items = [
         RivenSnapshotRow(
-            weapon_slug=r["weapon_slug"], ts=r["ts"], tier=r["tier"], count=r["count"],
-            min_price=r["min_price"], p25=r["p25"], median=r["median"],
-            p75=r["p75"], max_price=r["max_price"],
+            weapon_slug=r["weapon_slug"],
+            ts=r["ts"],
+            tier=r["tier"],
+            count=r["count"],
+            min_price=r["min_price"],
+            p25=r["p25"],
+            median=r["median"],
+            p75=r["p75"],
+            max_price=r["max_price"],
         )
         for r in rows
     ]
@@ -354,9 +455,11 @@ async def riven_poll_now(weapon_slug: str) -> dict:
     after watchlist_add closes that gap.
     """
     from alecaframe_api.main import auction_poller  # noqa: PLC0415
+
     if auction_poller is None:
         raise HTTPException(503, "auction poller not initialised")
     import time as _t
+
     await auction_poller._process_weapon(weapon_slug, int(_t.time()))
     return {"polled": weapon_slug}
 

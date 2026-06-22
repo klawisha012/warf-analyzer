@@ -13,6 +13,7 @@ The reverse map is best-effort. If a uniqueName has no rule, `resolve_unique_nam
 returns None and the caller falls back to skipping or asking the user to add
 an override.
 """
+
 from __future__ import annotations
 
 import re
@@ -22,13 +23,13 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ItemRef:
-    slug: str            # e.g. "kronen_prime_blade"
-    item_name: str       # e.g. "Kronen Prime Blade"
+    slug: str  # e.g. "kronen_prime_blade"
+    item_name: str  # e.g. "Kronen Prime Blade"
     thumb_url: str | None
     # v2 listing omits vaulted; it's only on the per-item detail endpoint.
     # Lifted to Optional so unknown ≠ False.
     vaulted: bool | None
-    wfm_id: str          # WFM internal id
+    wfm_id: str  # WFM internal id
 
 
 # Path prefixes that have a deterministic CamelCase -> slug rule.
@@ -42,9 +43,7 @@ _RECIPE_PREFIXES = (
 )
 
 # Mod path prefixes — these don't share the Recipe path layout.
-_MOD_PREFIXES = (
-    "/Lotus/Upgrades/Mods/",
-)
+_MOD_PREFIXES = ("/Lotus/Upgrades/Mods/",)
 
 _CAMEL_RX = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
 
@@ -96,27 +95,27 @@ _WEAPON_COMP_SUFFIXES = (
 def _normalise_recipe_tail(tail: str) -> str:
     """Transform internal DE CamelCase naming to correct WFM slug style."""
     slug = _camel_to_snake(tail)
-    
+
     # 1. Strip '_sentinel' suffix from Sentinels (e.g. nautilus_prime_sentinel_blueprint -> nautilus_prime_blueprint)
     slug = slug.replace("_sentinel", "")
-    
+
     # 2. Suffix normalization for components (Helmet -> Neuroptics, ChassisComponent -> Chassis)
     if slug.endswith("_chassis_component"):
         slug = slug.replace("_chassis_component", "_chassis")
     # Replace 'helmet' with 'neuroptics' anywhere in the slug to support helmet_blueprint
     slug = slug.replace("helmet", "neuroptics")
-        
+
     # 3. Strip redundant '_blueprint' suffix from weapon/sentinel parts (but NOT Warframe/Archwing components)
     if slug.endswith("_blueprint"):
         base = slug[:-10]
         if any(base.endswith(sfx) for sfx in _WEAPON_COMP_SUFFIXES):
             slug = base
-                
+
     # 4. Handle leading 'prime_' prefixes (e.g. prime_hikou_holster -> hikou_prime_pouch)
     # Common holster replacement
     if "holster" in slug:
         slug = slug.replace("holster", "pouch")
-        
+
     if slug.startswith("prime_"):
         # Look for the suffix in the slug
         for suffix in _SUFFIXES:
@@ -125,15 +124,15 @@ def _normalise_recipe_tail(tail: str) -> str:
                 sfx = "_chassis"
             elif suffix == "_helmet":
                 sfx = "_neuroptics"
-                
+
             if slug.endswith(suffix):
                 # Strip prime_ from start
                 base = slug[6:]
                 # Strip suffix from base
-                item = base[:-len(suffix)]
+                item = base[: -len(suffix)]
                 slug = f"{item}_prime{sfx}"
                 break
-                
+
     # 5. Internal codename translations
     # Dakra Prime Long Sword
     if "cronus_long_sword" in slug:
@@ -153,17 +152,17 @@ def _normalise_recipe_tail(tail: str) -> str:
         slug = slug.replace("archwing", "odonata")
     if "vento" in slug:
         slug = slug.replace("vento", "venato")
-        
+
     # Special weapon name mappings
     if "silva_aegis" in slug:
         slug = slug.replace("silva_aegis", "silva_and_aegis")
     if "cobra_crane" in slug:
         slug = slug.replace("cobra_crane", "cobra_and_crane")
-        
+
     # Handle to hilt for Silva/Cobra
     if "silva_and_aegis" in slug or "cobra_and_crane" in slug:
         slug = slug.replace("_handle", "_hilt")
-        
+
     # Bow mappings (only for Bow Prime / Prime Bow)
     if slug == "bow_prime_blueprint":
         slug = "paris_prime_blueprint"
@@ -174,7 +173,7 @@ def _normalise_recipe_tail(tail: str) -> str:
         slug = slug.replace("bow_prime", "paris_prime")
     if "prime_bow" in slug:
         slug = slug.replace("prime_bow", "paris_prime")
-        
+
     # Odonata component mappings
     if slug == "odonata_prime_chassis":
         slug = "odonata_prime_harness_blueprint"
@@ -182,7 +181,7 @@ def _normalise_recipe_tail(tail: str) -> str:
         slug = "odonata_prime_systems_blueprint"
     elif slug == "odonata_prime_wings":
         slug = "odonata_prime_wings_blueprint"
-        
+
     return slug
 
 
@@ -231,7 +230,9 @@ class SlugResolver:
         receive v2 orders carrying `itemId` instead of `slug`."""
         return self._by_id.get(wfm_id)
 
-    def resolve_unique_name(self, unique_name: str, pretty_name: str | None = None) -> str | None:
+    def resolve_unique_name(
+        self, unique_name: str, pretty_name: str | None = None
+    ) -> str | None:
         if unique_name in self._overrides:
             return self._overrides[unique_name]
         # Try resolving by pretty name first if provided (extremely robust for arcanes and mods)

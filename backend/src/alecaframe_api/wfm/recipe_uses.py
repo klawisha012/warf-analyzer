@@ -8,6 +8,7 @@ Unlike sets-loader, the key here is the raw catalogue `uniqueName` (matches
 inventory items' `ItemType` directly). No slug resolution required, so items
 with non-WFM-tradeable ingredients (Forma BP, Salvage, etc.) are included.
 """
+
 from __future__ import annotations
 
 import json
@@ -18,14 +19,20 @@ from pathlib import Path
 log = logging.getLogger("alecaframe.wfm.recipe_uses")
 
 _CATALOGUE_FILES = (
-    "Warframes.json", "Primary.json", "Secondary.json", "Melee.json",
-    "Sentinels.json", "Arch-Gun.json", "Arch-Melee.json",
+    "Warframes.json",
+    "Primary.json",
+    "Secondary.json",
+    "Melee.json",
+    "Sentinels.json",
+    "Arch-Gun.json",
+    "Arch-Melee.json",
 )
 
 
 @dataclass(frozen=True)
 class RecipeUse:
     """An item that uses some component as part of its recipe."""
+
     result_unique_name: str
     result_name: str
     count_required: int
@@ -50,8 +57,10 @@ def load_recipe_uses(*, cached_json_dir: Path) -> dict[str, list[RecipeUse]]:
         except Exception as e:
             log.warning("can't parse %s: %s", path, e)
             continue
-        items = raw if isinstance(raw, list) else (
-            list(raw.values()) if isinstance(raw, dict) else []
+        items = (
+            raw
+            if isinstance(raw, list)
+            else (list(raw.values()) if isinstance(raw, dict) else [])
         )
         for it in items:
             if not isinstance(it, dict):
@@ -70,15 +79,18 @@ def load_recipe_uses(*, cached_json_dir: Path) -> dict[str, list[RecipeUse]]:
                 qty = int(c.get("itemCount", 1) or 1)
                 if not cu:
                     continue
-                out.setdefault(cu, []).append(RecipeUse(
-                    result_unique_name=result_unique_name,
-                    result_name=result_name,
-                    count_required=qty,
-                ))
+                out.setdefault(cu, []).append(
+                    RecipeUse(
+                        result_unique_name=result_unique_name,
+                        result_name=result_name,
+                        count_required=qty,
+                    )
+                )
     for uses in out.values():
         uses.sort(key=lambda u: u.result_name)
     log.info(
         "recipe_uses: %d components indexed (%d total uses)",
-        len(out), sum(len(v) for v in out.values()),
+        len(out),
+        sum(len(v) for v in out.values()),
     )
     return out

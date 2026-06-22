@@ -10,12 +10,12 @@ visible: bool, user: {status: "ingame"|"online"|"offline", platform: "pc"|...,
 ingameName: str, ...}}`. Note v1's top-level `order_type` and `platform`
 moved to `type` and `user.platform`.
 """
+
 from __future__ import annotations
 
 import statistics
 from dataclasses import dataclass
 from typing import Literal
-
 
 Side = Literal["sell", "buy"]
 
@@ -90,18 +90,28 @@ def compute_stats(
 
     if not weighted_prices:
         return OrderBookStats(
-            side=side, online_only=online_only,
-            count_orders=count_orders, volume_qty=volume_qty,
-            min_price=None, p10=None, p25=None, median=None,
-            p75=None, p90=None, max_price=None, top5=[],
+            side=side,
+            online_only=online_only,
+            count_orders=count_orders,
+            volume_qty=volume_qty,
+            min_price=None,
+            p10=None,
+            p25=None,
+            median=None,
+            p75=None,
+            p90=None,
+            max_price=None,
+            top5=[],
         )
 
     # top5: unique prices sorted ascending (one entry per order, not per unit)
     unique_prices = sorted({int(o["platinum"]) for o in filtered if "platinum" in o})
 
     return OrderBookStats(
-        side=side, online_only=online_only,
-        count_orders=count_orders, volume_qty=volume_qty,
+        side=side,
+        online_only=online_only,
+        count_orders=count_orders,
+        volume_qty=volume_qty,
         min_price=int(weighted_prices[0]),
         p10=_percentile(weighted_prices, 10),
         p25=_percentile(weighted_prices, 25),

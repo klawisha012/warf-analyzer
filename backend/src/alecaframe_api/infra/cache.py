@@ -6,15 +6,18 @@ to isolate logical namespaces (e.g. `wfm` vs `signals`).
 
 Designed for `dict[str, Any]` payloads — anything else, use the client directly.
 """
+
 from __future__ import annotations
 
 import json
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Protocol
+from typing import Any, Protocol
 
 
 class _RedisLike(Protocol):
     """Just the redis.asyncio.Redis methods we touch."""
+
     async def get(self, key: str) -> str | None: ...
     async def set(self, key: str, value: str, ex: int | None = None) -> Any: ...
     async def delete(self, *keys: str) -> int: ...
@@ -41,8 +44,12 @@ class Cache:
             await self.client.delete(self._k(key))
             return None
 
-    async def set_json(self, key: str, value: dict[str, Any], *, ttl_seconds: int) -> None:
-        await self.client.set(self._k(key), json.dumps(value, ensure_ascii=False), ex=ttl_seconds)
+    async def set_json(
+        self, key: str, value: dict[str, Any], *, ttl_seconds: int
+    ) -> None:
+        await self.client.set(
+            self._k(key), json.dumps(value, ensure_ascii=False), ex=ttl_seconds
+        )
 
     async def delete(self, key: str) -> None:
         await self.client.delete(self._k(key))

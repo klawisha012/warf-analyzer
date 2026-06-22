@@ -1,22 +1,28 @@
 """Domain model for Void Fissures + parsing of warframestat.us payloads."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 # Map our settings Platform literal to warframestat.us path segments.
-PLATFORM_MAP: dict[str, str] = {"pc": "pc", "xbox": "xb1", "ps4": "ps4", "switch": "swi"}
+PLATFORM_MAP: dict[str, str] = {
+    "pc": "pc",
+    "xbox": "xb1",
+    "ps4": "ps4",
+    "switch": "swi",
+}
 
 
 @dataclass(frozen=True)
 class Fissure:
     id: str
-    era: str            # warframestat.us `tier`: Lith/Meso/Neo/Axi/Requiem/Omnia
+    era: str  # warframestat.us `tier`: Lith/Meso/Neo/Axi/Requiem/Omnia
     mission_type: str
     node: str
     planet: str | None
     enemy: str | None
-    is_hard: bool       # Steel Path
-    is_storm: bool      # Void Storm (Railjack)
+    is_hard: bool  # Steel Path
+    is_storm: bool  # Void Storm (Railjack)
     activation: str | None
     expiry: str | None
 
@@ -24,12 +30,12 @@ class Fissure:
 @dataclass(frozen=True)
 class Subscription:
     id: int
-    era: str | None          # None = any
-    mission_type: str | None # None = any
-    planet: str | None       # None = any (exact match)
-    node: str | None         # None = any (case-insensitive substring)
-    is_hard: bool | None     # None = any
-    is_storm: bool | None    # None = any
+    era: str | None  # None = any
+    mission_type: str | None  # None = any
+    planet: str | None  # None = any (exact match)
+    node: str | None  # None = any (case-insensitive substring)
+    is_hard: bool | None  # None = any
+    is_storm: bool | None  # None = any
     enabled: bool
     created_at: int
 

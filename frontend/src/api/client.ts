@@ -1,7 +1,11 @@
 /** Thin fetch wrapper. Backend lives under /api (rewritten to backend root by Vite/nginx). */
 
 export class ApiError extends Error {
-  constructor(public status: number, public detail: string, public path: string) {
+  constructor(
+    public status: number,
+    public detail: string,
+    public path: string,
+  ) {
     super(`API ${status} on ${path}: ${detail}`);
   }
 }

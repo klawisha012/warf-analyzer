@@ -12,10 +12,12 @@ export default function SetRowComp(props: { row: SetProfitRow }) {
     props.row.profit >= 30 ? "good" : props.row.profit >= 10 ? "info" : "neutral";
   const missing = () => Object.entries(props.row.missing_parts ?? {});
 
-  const ownedCount = () => Object.values(props.row.owned_parts ?? {}).reduce((sum, qty) => sum + qty, 0);
-  const missingCount = () => Object.values(props.row.missing_parts ?? {}).reduce((sum, qty) => sum + qty, 0);
+  const ownedCount = () =>
+    Object.values(props.row.owned_parts ?? {}).reduce((sum, qty) => sum + qty, 0);
+  const missingCount = () =>
+    Object.values(props.row.missing_parts ?? {}).reduce((sum, qty) => sum + qty, 0);
   const totalParts = () => ownedCount() + missingCount();
-  const pct = () => totalParts() > 0 ? Math.round((ownedCount() / totalParts()) * 100) : 0;
+  const pct = () => (totalParts() > 0 ? Math.round((ownedCount() / totalParts()) * 100) : 0);
 
   const partsList = () => {
     const list: { slug: string; owned: boolean; qty: number }[] = [];
@@ -42,9 +44,13 @@ export default function SetRowComp(props: { row: SetProfitRow }) {
             >
               {props.row.set_name}
             </a>
-            <div class="text-[11px] text-dim tracking-wide mt-0.5 select-all">{props.row.set_slug}</div>
+            <div class="text-[11px] text-dim tracking-wide mt-0.5 select-all">
+              {props.row.set_slug}
+            </div>
           </div>
-          <Badge variant={profitVariant() as never}>{t("sets.profitBadge", { plat: fmtPlat(props.row.profit) })}</Badge>
+          <Badge variant={profitVariant() as never}>
+            {t("sets.profitBadge", { plat: fmtPlat(props.row.profit) })}
+          </Badge>
         </header>
 
         <dl class="grid grid-cols-2 gap-3 text-xs mb-3 border-t border-line pt-3">
@@ -61,8 +67,12 @@ export default function SetRowComp(props: { row: SetProfitRow }) {
         {/* completeness segment gauges */}
         <div class="border-t border-line pt-3.5 mt-3">
           <div class="flex items-center justify-between text-[10px] mb-1.5">
-            <span class="text-sub uppercase tracking-wider">{t("sets.completeness") ?? "Completeness"}</span>
-            <span class="text-mint font-bold num">{ownedCount()} / {totalParts()} <span class="text-dim text-[9px]">({pct()}%)</span></span>
+            <span class="text-sub uppercase tracking-wider">
+              {t("sets.completeness") ?? "Completeness"}
+            </span>
+            <span class="text-mint font-bold num">
+              {ownedCount()} / {totalParts()} <span class="text-dim text-[9px]">({pct()}%)</span>
+            </span>
           </div>
           <div class="h-2 w-full rounded-full overflow-hidden border border-line p-0.5 flex gap-1 bg-surface2">
             <For each={partsList()}>
@@ -74,7 +84,7 @@ export default function SetRowComp(props: { row: SetProfitRow }) {
                     "bg-white/[0.06]": !part.owned,
                   }}
                   title={`${part.qty}x ${prettySlug(part.slug)} (${part.owned ? "Owned" : "Missing"})`}
-                ></div>
+                />
               )}
             </For>
           </div>
@@ -94,7 +104,8 @@ export default function SetRowComp(props: { row: SetProfitRow }) {
                     rel="noopener noreferrer"
                     class="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-surface2 border border-line text-sub hover:text-brand-soft hover:border-brand/30 transition-colors duration-200 inline-block"
                   >
-                    <span class="text-rose-400 font-semibold mr-0.5 num">{qty}×</span> {prettySlug(slug)}
+                    <span class="text-rose-400 font-semibold mr-0.5 num">{qty}×</span>{" "}
+                    {prettySlug(slug)}
                   </a>
                 </li>
               )}

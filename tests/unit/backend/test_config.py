@@ -1,4 +1,5 @@
 """Test that Settings reads env vars and applies sensible defaults."""
+
 from __future__ import annotations
 
 import importlib
@@ -9,15 +10,21 @@ import pytest
 def reload_settings():
     """Reimport the module so module-level env reads happen again."""
     import alecaframe_api.config as cfg
+
     importlib.reload(cfg)
     return cfg.Settings()
 
 
 def test_defaults_when_env_empty(monkeypatch: pytest.MonkeyPatch) -> None:
     for var in (
-        "ALECA_AGENT_URL", "ALECA_REDIS_URL", "ALECA_RABBITMQ_URL",
-        "ALECA_CENTRIFUGO_API", "ALECA_CENTRIFUGO_API_KEY",
-        "ALECA_DATA_DIR", "ALECA_TTL_SECONDS", "ALECA_WFM_PLATFORM",
+        "ALECA_AGENT_URL",
+        "ALECA_REDIS_URL",
+        "ALECA_RABBITMQ_URL",
+        "ALECA_CENTRIFUGO_API",
+        "ALECA_CENTRIFUGO_API_KEY",
+        "ALECA_DATA_DIR",
+        "ALECA_TTL_SECONDS",
+        "ALECA_WFM_PLATFORM",
     ):
         monkeypatch.delenv(var, raising=False)
     s = reload_settings()
