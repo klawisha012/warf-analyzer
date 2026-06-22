@@ -748,10 +748,14 @@ function HistorySparkline(props: {
     const padding = 6;
     const chartHeight = H - 2 * padding;
     const xRange = Math.max(1, maxTs - minTs);
+    // A flat series (constant median — common for stable weapons) has zero
+    // y-range; draw it as a centered horizontal line instead of one pinned to
+    // the bottom edge, where it reads as "no chart".
+    const flat = maxV === minV;
     const yRange = Math.max(1, maxV - minV);
     return ms.map((pt, i) => {
       const x = ((pt.ts - minTs) / xRange) * W;
-      const y = H - padding - ((pt.v - minV) / yRange) * chartHeight;
+      const y = flat ? H / 2 : H - padding - ((pt.v - minV) / yRange) * chartHeight;
       return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
     }).join(" ");
   });
