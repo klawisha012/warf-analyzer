@@ -16,7 +16,9 @@ export default function PageHeader(props: PageHeaderProps) {
       <div class="titles">
         <Show when={props.eyebrow}>
           <div class="eyebrow">
-            <Show when={props.pulse}><span class="pulse" /></Show>
+            <Show when={props.pulse}>
+              <span class="pulse" />
+            </Show>
             {props.eyebrow}
           </div>
         </Show>

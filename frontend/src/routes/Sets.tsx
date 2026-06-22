@@ -12,7 +12,7 @@ export default function Sets() {
 
   const sets = createQuery(() => ({
     queryKey: keys.meSetsProfit(minMargin()),
-    queryFn:  () => fetchers.meSetsProfit(minMargin()),
+    queryFn: () => fetchers.meSetsProfit(minMargin()),
   }));
 
   // Subscribe to every slug touched by the visible sets — set slug itself
@@ -28,6 +28,7 @@ export default function Sets() {
     }
     return Array.from(out);
   });
+  // eslint-disable-next-line solid/reactivity -- visibleSlugs Accessor is tracked inside useSlugChannel's createEffect
   useSlugChannel(visibleSlugs);
 
   return (
@@ -53,8 +54,10 @@ export default function Sets() {
         when={!sets.isLoading}
         fallback={
           <div class="surface flex flex-col items-center justify-center py-16 gap-3">
-            <div class="w-8 h-8 rounded-full border-2 border-brand/20 border-t-brand-soft animate-spin"></div>
-            <span class="text-xs uppercase tracking-widest text-dim animate-pulse">{t("common.loading")}</span>
+            <div class="w-8 h-8 rounded-full border-2 border-brand/20 border-t-brand-soft animate-spin" />
+            <span class="text-xs uppercase tracking-widest text-dim animate-pulse">
+              {t("common.loading")}
+            </span>
           </div>
         }
       >

@@ -6,11 +6,11 @@ type Variant = "neutral" | "good" | "warn" | "bad" | "vaulted" | "info";
 // good → mint (online), info/vaulted → indigo (brand), warn → amber, bad → rose.
 const VARIANT: Record<Variant, string> = {
   neutral: "chip",
-  good:    "chip online",
-  warn:    "chip warn",
-  bad:     "chip bad",
+  good: "chip online",
+  warn: "chip warn",
+  bad: "chip bad",
   vaulted: "chip brand",
-  info:    "chip brand",
+  info: "chip brand",
 };
 
 export default function Badge(props: { variant?: Variant; children: JSX.Element }) {

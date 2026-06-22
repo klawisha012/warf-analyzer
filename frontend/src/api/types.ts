@@ -171,7 +171,7 @@ export type RivenAuctionRow = {
   mod_rank: number | null;
   polarity: string | null;
   owner_name: string | null;
-  owner_status: string | null;       // 'ingame' | 'online' | 'offline'
+  owner_status: string | null; // 'ingame' | 'online' | 'offline'
   tier: string;
   attributes: RivenAuctionAttribute[];
   // Weapon-aware quality score (base profile in M1). grade/score are null when
@@ -327,4 +327,9 @@ export type FissureSubscriptionCreate = {
 
 export type TelegramChatRow = { chat_id: number; username: string | null; registered_at: number };
 
-export type TelegramChatsResponse = { bot_enabled: boolean; bot_username: string | null; total: number; items: TelegramChatRow[] };
+export type TelegramChatsResponse = {
+  bot_enabled: boolean;
+  bot_username: string | null;
+  total: number;
+  items: TelegramChatRow[];
+};

@@ -20,7 +20,7 @@ export default function Inventory() {
 
   const items = createQuery(() => ({
     queryKey: keys.meInventory(slot(), limit()),
-    queryFn:  () => fetchers.meInventory(slot(), limit()),
+    queryFn: () => fetchers.meInventory(slot(), limit()),
   }));
 
   const filtered = createMemo(() => {
@@ -32,11 +32,17 @@ export default function Inventory() {
     return all;
   });
 
+  // eslint-disable-next-line solid/reactivity -- filtered Accessor is consumed inside createMemo/createEffect within createPager
   const pager = createPager(filtered, 24);
 
   // Subscribe to every visible row so a push for any visible slug updates
   // the price store and re-renders that card.
-  useSlugChannel(() => filtered().map((it) => it.slug).filter(Boolean) as string[]);
+  useSlugChannel(
+    () =>
+      filtered()
+        .map((it) => it.slug)
+        .filter(Boolean) as string[],
+  );
 
   return (
     <div class="space-y-6">
@@ -45,13 +51,23 @@ export default function Inventory() {
         actions={
           <div class="flex flex-wrap items-center gap-3">
             <label class="flex items-center gap-2 text-xs font-medium text-sub cursor-pointer select-none">
-              <input type="checkbox" checked={craftOnly()} onChange={(e) => setCraftOnly(e.currentTarget.checked)} class="accent-[var(--indigo)] w-4 h-4" />
+              <input
+                type="checkbox"
+                checked={craftOnly()}
+                onChange={(e) => setCraftOnly(e.currentTarget.checked)}
+                class="accent-[var(--indigo)] w-4 h-4"
+              />
               {t("inventory.craftOnly")}
             </label>
             <div class="seg">
               <For each={SLOTS}>
                 {(s) => (
-                  <button type="button" class="seg-btn" classList={{ active: slot() === s }} onClick={() => setSlot(s)}>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    classList={{ active: slot() === s }}
+                    onClick={() => setSlot(s)}
+                  >
                     {t(`inventory.slot.${s}`)}
                   </button>
                 )}
@@ -72,8 +88,10 @@ export default function Inventory() {
         when={!items.isLoading}
         fallback={
           <div class="surface flex flex-col items-center justify-center py-16 gap-3">
-            <div class="w-8 h-8 rounded-full border-2 border-brand/20 border-t-brand-soft animate-spin"></div>
-            <span class="text-xs uppercase tracking-widest text-dim animate-pulse">{t("common.loading")}</span>
+            <div class="w-8 h-8 rounded-full border-2 border-brand/20 border-t-brand-soft animate-spin" />
+            <span class="text-xs uppercase tracking-widest text-dim animate-pulse">
+              {t("common.loading")}
+            </span>
           </div>
         }
       >
@@ -84,7 +102,12 @@ export default function Inventory() {
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
             <For each={pager.pageItems()}>{(it) => <ItemCard item={it} />}</For>
           </div>
-          <PagerControl page={pager.page()} totalPages={pager.totalPages()} total={pager.total()} onPage={pager.setPage} />
+          <PagerControl
+            page={pager.page()}
+            totalPages={pager.totalPages()}
+            total={pager.total()}
+            onPage={pager.setPage}
+          />
         </Show>
       </Show>
     </div>

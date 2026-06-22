@@ -21,7 +21,7 @@ export default function PrimeParts() {
 
   const parts = createQuery(() => ({
     queryKey: keys.mePrimeParts(minCount()),
-    queryFn:  () => fetchers.mePrimeParts(minCount()),
+    queryFn: () => fetchers.mePrimeParts(minCount()),
   }));
 
   const filtered = createMemo(() => {
@@ -32,12 +32,20 @@ export default function PrimeParts() {
     return all;
   });
 
-  const totalValue = createMemo(() => filtered().reduce((s, it) => s + (it.estimated_value ?? 0), 0));
+  const totalValue = createMemo(() =>
+    filtered().reduce((s, it) => s + (it.estimated_value ?? 0), 0),
+  );
   const totalQty = createMemo(() => filtered().reduce((s, it) => s + (it.count ?? 0), 0));
 
+  // eslint-disable-next-line solid/reactivity -- filtered Accessor is consumed inside createMemo/createEffect within createPager
   const pager = createPager(filtered, 24);
 
-  useSlugChannel(() => filtered().map((it) => it.slug).filter(Boolean) as string[]);
+  useSlugChannel(
+    () =>
+      filtered()
+        .map((it) => it.slug)
+        .filter(Boolean) as string[],
+  );
 
   return (
     <div class="space-y-6">
@@ -46,20 +54,42 @@ export default function PrimeParts() {
         actions={
           <div class="flex flex-wrap items-center gap-3">
             <label class="flex items-center gap-2 text-xs font-medium text-sub cursor-pointer select-none">
-              <input type="checkbox" checked={hideZero()} onChange={(e) => setHideZero(e.currentTarget.checked)} class="accent-[var(--indigo)] w-4 h-4" />
+              <input
+                type="checkbox"
+                checked={hideZero()}
+                onChange={(e) => setHideZero(e.currentTarget.checked)}
+                class="accent-[var(--indigo)] w-4 h-4"
+              />
               {t("common.hideZero")}
             </label>
             <label class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-sub">
               {t("primeParts.minQty")}
-              <input type="number" min={1} value={minCount()} onInput={(e) => setMinCount(Math.max(1, +e.currentTarget.value || 1))} class="field w-16 text-center num" />
+              <input
+                type="number"
+                min={1}
+                value={minCount()}
+                onInput={(e) => setMinCount(Math.max(1, +e.currentTarget.value || 1))}
+                class="field w-16 text-center num"
+              />
             </label>
-            <input type="search" class="field sm:w-48" placeholder={t("common.filter")} value={q()} onInput={(e) => setQ(e.currentTarget.value)} />
+            <input
+              type="search"
+              class="field sm:w-48"
+              placeholder={t("common.filter")}
+              value={q()}
+              onInput={(e) => setQ(e.currentTarget.value)}
+            />
           </div>
         }
       />
 
       <section class="grid grid-cols-1 sm:grid-cols-3 gap-[18px]">
-        <StatTile label={t("common.value")} positive unit={t("common.plat")} value={<span class="num">{fmtPlat(totalValue())}</span>} />
+        <StatTile
+          label={t("common.value")}
+          positive
+          unit={t("common.plat")}
+          value={<span class="num">{fmtPlat(totalValue())}</span>}
+        />
         <StatTile label={t("common.unique")} value={<span class="num">{filtered().length}</span>} />
         <StatTile label={t("common.totalQty")} value={<span class="num">{totalQty()}</span>} />
       </section>
@@ -68,12 +98,17 @@ export default function PrimeParts() {
         when={!parts.isLoading}
         fallback={
           <div class="surface flex flex-col items-center justify-center py-16 gap-3">
-            <div class="w-8 h-8 rounded-full border-2 border-brand/20 border-t-brand-soft animate-spin"></div>
-            <span class="text-xs uppercase tracking-widest text-dim animate-pulse">{t("common.loading")}</span>
+            <div class="w-8 h-8 rounded-full border-2 border-brand/20 border-t-brand-soft animate-spin" />
+            <span class="text-xs uppercase tracking-widest text-dim animate-pulse">
+              {t("common.loading")}
+            </span>
           </div>
         }
       >
-        <Show when={filtered().length > 0} fallback={<EmptyState title={t("primeParts.empty")} hint={t("primeParts.emptyHint")} />}>
+        <Show
+          when={filtered().length > 0}
+          fallback={<EmptyState title={t("primeParts.empty")} hint={t("primeParts.emptyHint")} />}
+        >
           <div class="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start">
             <For each={pager.pageItems()}>
               {(it) => {
@@ -101,7 +136,12 @@ export default function PrimeParts() {
               }}
             </For>
           </div>
-          <PagerControl page={pager.page()} totalPages={pager.totalPages()} total={pager.total()} onPage={pager.setPage} />
+          <PagerControl
+            page={pager.page()}
+            totalPages={pager.totalPages()}
+            total={pager.total()}
+            onPage={pager.setPage}
+          />
         </Show>
       </Show>
     </div>

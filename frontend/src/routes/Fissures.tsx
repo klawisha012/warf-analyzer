@@ -61,28 +61,36 @@ export default function Fissures() {
   };
 
   // Any non-empty filter is an active constraint.
-  const hasFilters = () =>
-    !!(era() || mission() || planet() || node().trim() || hard() || storm());
+  const hasFilters = () => !!(era() || mission() || planet() || node().trim() || hard() || storm());
 
   // The same controls that build a subscription also narrow the live list;
   // an empty value means "no constraint" for that field.
   const filteredLive = () => {
     const items = live.data?.items ?? [];
-    const e = era(), m = mission(), p = planet();
+    const e = era(),
+      m = mission(),
+      p = planet();
     const n = node().trim().toLowerCase();
-    const h = triToBool(hard()), s = triToBool(storm());
-    return items.filter((f) =>
-      (!e || f.era === e) &&
-      (!m || f.mission_type === m) &&
-      (!p || f.planet === p) &&
-      (!n || (f.node ?? "").toLowerCase() === n) &&
-      (h === null || f.is_hard === h) &&
-      (s === null || f.is_storm === s),
+    const h = triToBool(hard()),
+      s = triToBool(storm());
+    return items.filter(
+      (f) =>
+        (!e || f.era === e) &&
+        (!m || f.mission_type === m) &&
+        (!p || f.planet === p) &&
+        (!n || (f.node ?? "").toLowerCase() === n) &&
+        (h === null || f.is_hard === h) &&
+        (s === null || f.is_storm === s),
     );
   };
 
   function clearFilters() {
-    setEra(""); setMission(""); setPlanet(""); setNode(""); setHard(""); setStorm("");
+    setEra("");
+    setMission("");
+    setPlanet("");
+    setNode("");
+    setHard("");
+    setStorm("");
   }
 
   async function addSub() {
@@ -94,7 +102,12 @@ export default function Fissures() {
       is_hard: triToBool(hard()),
       is_storm: triToBool(storm()),
     });
-    setEra(""); setMission(""); setPlanet(""); setNode(""); setHard(""); setStorm("");
+    setEra("");
+    setMission("");
+    setPlanet("");
+    setNode("");
+    setHard("");
+    setStorm("");
     await qc.invalidateQueries({ queryKey: keys.fissuresSubs() });
   }
 
@@ -123,13 +136,23 @@ export default function Fissures() {
               </select>
 
               <label class="block text-xs text-sub">{t("fissures.mission")}</label>
-              <select value={mission()} onChange={(e) => setMission(e.currentTarget.value)} class="field">
+              <select
+                value={mission()}
+                onChange={(e) => setMission(e.currentTarget.value)}
+                class="field"
+              >
                 <option value="">{t("fissures.any")}</option>
-                <For each={meta.data?.mission_types ?? []}>{(x) => <option value={x}>{x}</option>}</For>
+                <For each={meta.data?.mission_types ?? []}>
+                  {(x) => <option value={x}>{x}</option>}
+                </For>
               </select>
 
               <label class="block text-xs text-sub">{t("fissures.planet")}</label>
-              <select value={planet()} onChange={(e) => setPlanet(e.currentTarget.value)} class="field">
+              <select
+                value={planet()}
+                onChange={(e) => setPlanet(e.currentTarget.value)}
+                class="field"
+              >
                 <option value="">{t("fissures.any")}</option>
                 <For each={meta.data?.planets ?? []}>{(x) => <option value={x}>{x}</option>}</For>
               </select>
@@ -154,7 +177,11 @@ export default function Fissures() {
               </select>
 
               <label class="block text-xs text-sub">{t("fissures.voidStorm")}</label>
-              <select value={storm()} onChange={(e) => setStorm(e.currentTarget.value)} class="field">
+              <select
+                value={storm()}
+                onChange={(e) => setStorm(e.currentTarget.value)}
+                class="field"
+              >
                 <option value="">{t("fissures.any")}</option>
                 <option value="yes">{t("fissures.yes")}</option>
                 <option value="no">{t("fissures.no")}</option>
@@ -177,12 +204,26 @@ export default function Fissures() {
                         <span class="flex flex-wrap gap-1.5 items-center">
                           <Badge variant="info">{s.era ?? t("fissures.any")}</Badge>
                           <Badge>{s.mission_type ?? t("fissures.any")}</Badge>
-                          <Show when={s.planet}><Badge variant="info">{s.planet}</Badge></Show>
-                          <Show when={s.node}><Badge>{s.node}</Badge></Show>
-                          <Show when={s.is_hard === true}><Badge variant="warn">SP</Badge></Show>
-                          <Show when={s.is_storm === true}><Badge variant="vaulted">Storm</Badge></Show>
+                          <Show when={s.planet}>
+                            <Badge variant="info">{s.planet}</Badge>
+                          </Show>
+                          <Show when={s.node}>
+                            <Badge>{s.node}</Badge>
+                          </Show>
+                          <Show when={s.is_hard === true}>
+                            <Badge variant="warn">SP</Badge>
+                          </Show>
+                          <Show when={s.is_storm === true}>
+                            <Badge variant="vaulted">Storm</Badge>
+                          </Show>
                         </span>
-                        <button type="button" onClick={() => removeSub(s.id)} class="text-dim hover:text-rose-400 px-1 transition-colors">×</button>
+                        <button
+                          type="button"
+                          onClick={() => removeSub(s.id)}
+                          class="text-dim hover:text-rose-400 px-1 transition-colors"
+                        >
+                          ×
+                        </button>
                       </li>
                     )}
                   </For>
@@ -214,7 +255,11 @@ export default function Fissures() {
                 >
                   <ul class="space-y-1">
                     <For each={chats.data?.items ?? []}>
-                      {(c) => <li class="text-sm text-sub">{c.username ? `@${c.username}` : c.chat_id}</li>}
+                      {(c) => (
+                        <li class="text-sm text-sub">
+                          {c.username ? `@${c.username}` : c.chat_id}
+                        </li>
+                      )}
                     </For>
                   </ul>
                 </Show>
@@ -229,8 +274,14 @@ export default function Fissures() {
         <Card title={t("fissures.live")}>
           <Show when={hasFilters()}>
             <div class="flex items-center justify-between mb-3 text-xs text-dim">
-              <span class="num">{filteredLive().length} / {(live.data?.items ?? []).length}</span>
-              <button type="button" onClick={clearFilters} class="text-dim hover:text-fg transition-colors">
+              <span class="num">
+                {filteredLive().length} / {(live.data?.items ?? []).length}
+              </span>
+              <button
+                type="button"
+                onClick={clearFilters}
+                class="text-dim hover:text-fg transition-colors"
+              >
                 {t("fissures.clearFilters")}
               </button>
             </div>
@@ -239,7 +290,11 @@ export default function Fissures() {
             when={filteredLive().length > 0}
             fallback={
               <EmptyState
-                title={(live.data?.items ?? []).length > 0 ? t("fissures.liveNoMatch") : t("fissures.liveEmpty")}
+                title={
+                  (live.data?.items ?? []).length > 0
+                    ? t("fissures.liveNoMatch")
+                    : t("fissures.liveEmpty")
+                }
                 hint=""
               />
             }
@@ -252,8 +307,12 @@ export default function Fissures() {
                       <Badge variant="info">{f.era}</Badge>
                       <span class="text-fg font-medium">{f.mission_type}</span>
                       <span class="text-dim">· {f.node}</span>
-                      <Show when={f.is_hard}><Badge variant="warn">SP</Badge></Show>
-                      <Show when={f.is_storm}><Badge variant="vaulted">Storm</Badge></Show>
+                      <Show when={f.is_hard}>
+                        <Badge variant="warn">SP</Badge>
+                      </Show>
+                      <Show when={f.is_storm}>
+                        <Badge variant="vaulted">Storm</Badge>
+                      </Show>
                     </span>
                     <span class="text-xs text-dim num">{fmtEta(f.eta_seconds)}</span>
                   </li>

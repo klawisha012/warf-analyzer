@@ -1,7 +1,7 @@
 import { Show } from "solid-js";
 
 type PagerProps = {
-  page: number;       // 0-based
+  page: number; // 0-based
   totalPages: number;
   total: number;
   onPage: (n: number) => void;
