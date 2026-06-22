@@ -19,7 +19,11 @@ def _weapon_row(name: str, **stats) -> dict:
     return {"name": name, "category": "primary", "disposition": 4, "stats": stats}
 
 
-def _pos(name: str, value: float = 100.0) -> dict:
+# Default value is intentionally above any nominal ceiling: grade_roll_value
+# (S2) saturates to 1.0, so these S1 behavioral tests run in "presence mode"
+# (a max roll) and assert weight/normalization behavior independent of roll
+# value. Tests that care about the roll *value* pass it explicitly.
+def _pos(name: str, value: float = 1000.0) -> dict:
     return {"name": name, "value": value, "positive": True}
 
 
