@@ -8,6 +8,7 @@ import ItemThumb from "../components/ItemThumb";
 import { wfmAsset } from "../lib/itemImages";
 import { fetchers, keys } from "../api/queries";
 import { fmtPlat, prettySlug } from "../lib/format";
+import { rivenAttrName } from "../lib/rivenAttrs";
 import { useRivenAlerts } from "../hooks/useRivenAlerts";
 import { alertCountByWeapon } from "../lib/rivenAlerts";
 import { t, locale } from "../i18n";
@@ -337,7 +338,7 @@ function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
                     <h3 class="text-xs font-semibold text-cyan uppercase tracking-wider mb-2">{t("rivens.harmlessNegatives")}</h3>
                     <ul class="flex flex-wrap gap-2">
                       <For each={auctions.data!.harmless_negatives}>
-                        {(neg) => <li class="text-xs px-2.5 py-1 rounded-full bg-cyan/[0.08] border border-cyan/25 text-cyan">-{prettyAttr(neg)}</li>}
+                        {(neg) => <li class="text-xs px-2.5 py-1 rounded-full bg-cyan/[0.08] border border-cyan/25 text-cyan">-{rivenAttrName(neg)}</li>}
                       </For>
                     </ul>
                   </div>
@@ -347,7 +348,7 @@ function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
                     <h3 class="text-xs font-semibold text-rose-400 uppercase tracking-wider mb-2">{t("rivens.avoidNegatives")}</h3>
                     <ul class="flex flex-wrap gap-2">
                       <For each={auctions.data!.avoid_negatives}>
-                        {(neg) => <li class="text-xs px-2.5 py-1 rounded-full bg-rose-500/[0.08] border border-rose-500/25 text-rose-300">-{prettyAttr(neg)}</li>}
+                        {(neg) => <li class="text-xs px-2.5 py-1 rounded-full bg-rose-500/[0.08] border border-rose-500/25 text-rose-300">-{rivenAttrName(neg)}</li>}
                       </For>
                     </ul>
                   </div>
@@ -572,7 +573,7 @@ function TopAttrs(props: { attrs: RivenTopAttribute[] }) {
   return (
     <ul class="flex flex-wrap gap-2">
       <For each={props.attrs}>
-        {(a) => <li class="text-xs px-2.5 py-1 rounded-full bg-mint/[0.08] border border-mint/25 text-mint">{prettyAttr(a.name)}</li>}
+        {(a) => <li class="text-xs px-2.5 py-1 rounded-full bg-mint/[0.08] border border-mint/25 text-mint">{rivenAttrName(a.name)}</li>}
       </For>
     </ul>
   );
@@ -695,7 +696,7 @@ function AuctionTable(props: { rows: RivenAuctionRow[]; outliers: RivenOutlier[]
                             "bg-rose-500/15 text-rose-300": !a.positive,
                           }}
                         >
-                          {prettyAttr(a.name)} {a.value > 0 && a.positive ? "+" : ""}{a.value}
+                          {rivenAttrName(a.name)} {a.value > 0 && a.positive ? "+" : ""}{a.value}
                         </span>
                       )}
                     </For>
@@ -789,10 +790,6 @@ function HistorySparkline(props: {
       </Show>
     </Show>
   );
-}
-
-function prettyAttr(name: string): string {
-  return name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function auctionUrl(auctionId: string): string {
