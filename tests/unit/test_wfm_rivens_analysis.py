@@ -8,6 +8,7 @@ from alecaframe_api.wfm.rivens_analysis import (
     classify_tiers,
     compute_tier_stats,
     detect_outliers,
+    eval_riven_quality,
     summarize_attributes,
     suggest_strategies,
 )
@@ -44,6 +45,57 @@ def test_classify_tiers_uses_price_quartiles() -> None:
     assert len(tiers["god"]) >= 2
     assert len(tiers["low"]) >= 2
     assert len(tiers["mid"]) >= 2
+
+
+def test_god_tier_requires_value_raising_negative() -> None:
+    # 2 premium positives + a harmless (value-raising) curse = the god-roll shape.
+    god = _auc("g", 500, [
+        ("critical_chance", 150, True), ("critical_damage", 120, True),
+        ("zoom", -60, False),
+    ])
+    assert eval_riven_quality(god) == "god"
+
+
+def test_two_positives_without_negative_is_not_god() -> None:
+    # Strong but cursed-less roll: good, but not god — it leaves free damage on
+    # the table. Falls through to its price tier (None).
+    no_curse = _auc("m", 400, [
+        ("critical_chance", 150, True), ("multishot", 120, True),
+    ])
+    assert eval_riven_quality(no_curse) is None
+
+
+def test_fatal_negative_is_low() -> None:
+    fatal = _auc("l", 999, [
+        ("critical_chance", 150, True), ("multishot", 120, True),
+        ("base_damage_/_melee_damage", -30, False),   # curse on a core stat
+    ])
+    assert eval_riven_quality(fatal) == "low"
+
+
+def test_zero_premium_positives_is_low() -> None:
+    junk = _auc("j", 50, [("zoom", 80, True), ("ammo_maximum", 90, True)])
+    assert eval_riven_quality(junk) == "low"
+
+
+def test_v2_slugs_are_recognized_as_premium() -> None:
+    # Real auctions ship v2 slugs (heat_damage, not heat); the god rule must see them.
+    god = _auc("g2", 600, [
+        ("heat_damage", 130, True), ("multishot", 110, True),
+        ("recoil", -50, False),
+    ])
+    assert eval_riven_quality(god) == "god"
+
+
+def test_god_quality_promotes_into_god_tier() -> None:
+    # End to end through classify_tiers: a god-shaped cheap lot still lands in god.
+    aucs = [_auc(f"a{i}", price=i * 10) for i in range(1, 13)]
+    aucs.append(_auc("godcheap", 15, [
+        ("critical_chance", 150, True), ("critical_damage", 120, True),
+        ("zoom", -60, False),
+    ]))
+    tiers = classify_tiers(aucs)
+    assert "godcheap" in {a["id"] for a in tiers["god"]}
 
 
 def test_classify_tiers_handles_empty_list() -> None:

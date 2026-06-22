@@ -45,33 +45,44 @@ class Outlier:
     discount_pct: int   # 100 * (1 - price/historical_median), rounded
 
 
-# Highly valued premium positive stats for weapons (rifles, pistols, shotguns, melee)
+# NOTE: keyed by the WFM attribute slug as it actually arrives on auctions
+# (verified live: v1 /auctions/search returns v2-style slugs —
+# base_damage_/_melee_damage, heat_damage, damage_vs_grineer,
+# fire_rate_/_attack_speed, ...). The old bare spellings (damage, heat,
+# damage_to_grineer) never matched real data, so the quality override was a
+# no-op and everything fell back to raw price quartiles.
+
+# Highly valued premium positive stats (rifles, pistols, shotguns, melee).
 GOD_POSITIVES = {
-    # Offense / Crits
-    "multishot", "critical_damage", "critical_chance", "damage", "melee_damage",
-    # Elements (highly valued for combining viral/corrosive/heat)
-    "toxin", "cold", "heat", "electricity",
-    # Melee meta / speeds
-    "range", "attack_speed", "fire_rate", "status_chance",
-    # Additional high tier
-    "slash", "elemental_damage", "critical_chance_on_slide"
+    "multishot", "critical_damage", "critical_chance", "status_chance",
+    "base_damage_/_melee_damage", "fire_rate_/_attack_speed",
+    # Elements (viral/corrosive/heat combos)
+    "toxin_damage", "cold_damage", "heat_damage", "electric_damage",
+    # Faction damage — large multipliers, premium
+    "damage_vs_grineer", "damage_vs_corpus", "damage_vs_infested",
+    # Melee meta
+    "range", "critical_chance_on_slide_attack", "slash_damage",
 }
 
-# Fatal negative curses that ruin the mod performance (making it trash/low-tier)
+# Fatal negative curses that gut the build → demote to low regardless of price.
+# A negative on a core damage/crit/status stat. Faction damage is left OUT
+# (a −damage_vs_<one faction> is situational, not build-fatal).
 FATAL_NEGATIVES = {
-    "damage", "melee_damage", "multishot", "critical_damage", "critical_chance",
-    "status_chance", "range", "attack_speed", "fire_rate", "slash",
-    # Negative elements also ruin viral/corrosive combos
-    "toxin", "cold", "heat", "electricity",
-    # Negative faction damage is also fatal
-    "damage_to_grineer", "damage_to_corpus", "damage_to_infested"
+    "multishot", "critical_damage", "critical_chance", "status_chance",
+    "base_damage_/_melee_damage", "fire_rate_/_attack_speed",
+    "toxin_damage", "cold_damage", "heat_damage", "electric_damage",
+    "range", "slash_damage",
 }
 
-# Harmless negatives that boost positive stats without hurting performance
+# "Value-raising" negatives: a curse on a stat the build doesn't use. The curse
+# itself boosts the two positives (~+24%) while costing nothing useful — this is
+# exactly what makes a god roll. Dropping one of these is free.
 HARMLESS_NEGATIVES = {
-    "zoom", "maximum_ammo", "ammo_maximum", "magazine_capacity", "finisher_damage",
-    "slide_attack_critical_chance", "projectile_speed", "flight_speed",
-    "status_duration", "recoil", "impact", "puncture"
+    "zoom", "ammo_maximum", "magazine_capacity", "recoil", "reload_speed",
+    "projectile_speed", "punch_through", "status_duration",
+    "impact_damage", "puncture_damage",
+    # Melee utilities
+    "finisher_damage", "combo_duration", "channeling_efficiency",
 }
 
 
@@ -84,9 +95,13 @@ def eval_riven_quality(a: dict) -> str | None:
     """Evaluate Riven attributes to detect 'god', 'mid', or 'low' characteristics.
 
     Returns:
-      - 'low': if it has a fatal negative or extremely poor positive stats.
-      - 'god': if it has 2+ premium positive stats and no negative or a harmless negative.
-      - None: if it's standard mid-tier material.
+      - 'low': fatal negative on a core stat, or zero premium positive stats.
+      - 'god': 2+ premium positives AND a value-raising ("harmless") negative.
+        The curse is REQUIRED — in-game it boosts the two positives (~+24%) while
+        costing nothing the build uses, which is precisely what makes a god roll.
+        A 2-positive roll with NO negative is strong but only mid (it leaves the
+        free damage of a curse on the table).
+      - None: standard mid-tier material → falls back to its price quartile.
     """
     item = a.get("item") or {}
     attributes = item.get("attributes") or []
@@ -97,37 +112,27 @@ def eval_riven_quality(a: dict) -> str | None:
     negatives = []
     for at in attributes:
         name = (at.get("url_name") or at.get("name") or "").lower().strip().replace(" ", "_").replace("-", "_")
-        positive = bool(at.get("positive"))
-        if positive:
+        if bool(at.get("positive")):
             positives.append(name)
         else:
             negatives.append(name)
 
-    # Fatal Negatives - immediately trash/low-tier
-    for neg in negatives:
-        if neg in FATAL_NEGATIVES:
-            return "low"
+    # Fatal negative on a core stat → trash regardless of listing price.
+    if any(neg in FATAL_NEGATIVES for neg in negatives):
+        return "low"
 
-    # Count premium positive stats
     premium_pos_count = sum(1 for pos in positives if pos in GOD_POSITIVES)
 
-    # If it has a negative stat, is it harmless?
-    has_bad_negative = False
-    for neg in negatives:
-        if neg not in HARMLESS_NEGATIVES:
-            has_bad_negative = True
-            break
-
-    # God Tier criteria:
-    # 2+ premium positives AND (either no negative or a harmless negative)
-    if premium_pos_count >= 2 and not has_bad_negative:
-        return "god"
-
-    # Low Tier criteria:
-    # 0 premium positives (e.g. only utility stats like zoom, ammo maximum, slide critical as positives)
+    # No premium positive at all (only utility rolls like zoom/ammo) → low.
     if premium_pos_count == 0:
         return "low"
 
+    # God tier: 2+ premium positives AND a value-raising negative present.
+    has_value_raising_negative = any(neg in HARMLESS_NEGATIVES for neg in negatives)
+    if premium_pos_count >= 2 and has_value_raising_negative:
+        return "god"
+
+    # Everything else (incl. strong 2-positive rolls with no curse) → price tier.
     return None
 
 
