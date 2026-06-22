@@ -74,15 +74,19 @@ FATAL_NEGATIVES = {
     "range", "slash_damage",
 }
 
-# "Value-raising" negatives: a curse on a stat the build doesn't use. The curse
-# itself boosts the two positives (~+24%) while costing nothing useful — this is
-# exactly what makes a god roll. Dropping one of these is free.
+# "Value-raising" negatives: a curse on a stat that NO weapon's main build uses,
+# so it boosts the two positives (~+24%) for free — the god-roll shape. This set
+# must stay conservative and context-FREE: only stats dead on essentially every
+# build qualify. Anything build-/weapon-dependent is excluded, because a negative
+# there genuinely hurts on some weapons:
+#   - combo_duration / chance_to_gain_combo_count → melee combo builds need it
+#   - channeling_* / finisher_damage → wanted by specific melee builds
+#   - status_duration → status builds want it
+#   - reload_speed / projectile_speed / punch_through → matter on many guns
+#   - impact/puncture/slash → real damage types for IPS builds
+# Those used to be here and over-promoted junk into god tier; removed.
 HARMLESS_NEGATIVES = {
-    "zoom", "ammo_maximum", "magazine_capacity", "recoil", "reload_speed",
-    "projectile_speed", "punch_through", "status_duration",
-    "impact_damage", "puncture_damage",
-    # Melee utilities
-    "finisher_damage", "combo_duration", "channeling_efficiency",
+    "zoom", "ammo_maximum", "magazine_capacity", "recoil",
 }
 
 
