@@ -24,7 +24,6 @@ out/
 frontend/node_modules
 frontend/dist
 frontend/.vite
-frontend/coverage
 
 # Env files
 .env
