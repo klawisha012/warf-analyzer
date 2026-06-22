@@ -116,6 +116,32 @@ async def test_get_riven_auctions_raises_on_first_failure(client_factory, httpx_
 
 
 @pytest.mark.asyncio
+async def test_get_riven_weapons_uses_v2_and_maps_to_v1_shape(client_factory, httpx_mock: HTTPXMock) -> None:
+    # The catalogue migrated to v2 /riven/weapons (v1 /riven/items now errors).
+    # The client must hit v2 and map the new shape back to the v1 keys callers use.
+    httpx_mock.add_response(
+        url="https://mock.wfm.test/v2/riven/weapons",
+        method="GET",
+        json={"apiVersion": "0.25.0", "data": [
+            {"id": "x", "slug": "torid", "group": "primary", "rivenType": "rifle",
+             "disposition": 1.3, "reqMasteryRank": 5,
+             "i18n": {"en": {"name": "Torid", "icon": "items/images/en/torid.png",
+                             "thumb": "items/images/en/thumbs/torid.png"}}},
+        ]},
+    )
+    c = client_factory()
+    weapons = await c.get_riven_weapons()
+    assert len(weapons) == 1
+    w = weapons[0]
+    assert w["url_name"] == "torid"
+    assert w["item_name"] == "Torid"
+    assert w["icon"] == "items/images/en/torid.png"
+    assert w["riven_disposition"] == 1.3
+    assert w["riven_type"] == "rifle"
+    assert w["group"] == "primary"
+
+
+@pytest.mark.asyncio
 async def test_get_auction_entry_returns_payload(client_factory, httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(
         url="https://mock.wfm.test/v1/auctions/entry/abc123",

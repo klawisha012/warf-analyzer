@@ -155,17 +155,42 @@ class WFMAuctionClient:
         )
         return dict((payload.get("payload") or {}).get("auction") or {})
 
+    def _v2_url(self, path: str) -> str:
+        """Absolute v2 URL from the v1 base (the riven catalogue migrated to v2;
+        auctions are still v1). httpx uses an absolute URL as-is over base_url."""
+        base = self.base_url.rstrip("/")
+        if base.endswith("/v1"):
+            base = base[:-3] + "/v2"
+        return f"{base}{path}"
+
+    @staticmethod
+    def _map_v2_weapon(it: dict[str, Any]) -> dict[str, Any]:
+        """Map a v2 `/riven/weapons` item to the v1 `/riven/items` shape the rest
+        of the code consumes (url_name/item_name/icon/riven_disposition/...)."""
+        en = (it.get("i18n") or {}).get("en") or {}
+        return {
+            "url_name": it.get("slug"),
+            "item_name": en.get("name") or it.get("slug"),
+            "icon": en.get("icon"),
+            "thumb": en.get("thumb"),
+            "riven_disposition": it.get("disposition"),
+            "riven_type": it.get("rivenType"),
+            "group": it.get("group"),
+            "mastery_level": it.get("reqMasteryRank"),
+        }
+
     async def get_riven_weapons(self, *, fresh: bool = False) -> list[dict[str, Any]]:
         """Catalogue of weapons that can carry a riven (with disposition).
 
-        v1 path: `/v1/riven/items`. Returns `{"payload": {"items": [{url_name,
-        item_name, riven_type, group, icon, riven_disposition, mastery_level}]}}`.
-        Cached for 24h — disposition values change once or twice a year.
+        The catalogue migrated to v2: `/v1/riven/items` now 404s/errors, the data
+        lives at `/v2/riven/weapons` with a new shape (`{data: [{slug, rivenType,
+        disposition, i18n:{en:{name,icon}}}]}`). Mapped back to the v1 keys so
+        callers are unaffected. Cached 24h — disposition changes once or twice a year.
         """
         payload = await self._request(
-            "GET", "/riven/items",
-            cache_key="riven_items",
+            "GET", self._v2_url("/riven/weapons"),
+            cache_key="riven_weapons_v2",
             cache_ttl=_TTL_RIVEN_ITEMS,
             fresh=fresh,
         )
-        return list((payload.get("payload") or {}).get("items") or [])
+        return [self._map_v2_weapon(it) for it in (payload.get("data") or [])]
