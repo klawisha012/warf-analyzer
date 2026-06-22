@@ -6,6 +6,7 @@ Per tick:
 3. For each subscription × matching fissure not yet in the dedup ledger:
    record it, then (if Telegram is on) broadcast to every registered chat.
 4. Prune ledger entries older than NOTIFICATION_TTL_S."""
+
 from __future__ import annotations
 
 import asyncio
@@ -43,11 +44,17 @@ def format_message(f: Fissure) -> str:
 def _row_to_sub(r: dict) -> Subscription:
     def _b(v) -> bool | None:
         return None if v is None else bool(v)
+
     return Subscription(
-        id=int(r["id"]), era=r["era"], mission_type=r["mission_type"],
-        planet=r["planet"], node=r["node"],
-        is_hard=_b(r["is_hard"]), is_storm=_b(r["is_storm"]),
-        enabled=bool(r["enabled"]), created_at=int(r["created_at"]),
+        id=int(r["id"]),
+        era=r["era"],
+        mission_type=r["mission_type"],
+        planet=r["planet"],
+        node=r["node"],
+        is_hard=_b(r["is_hard"]),
+        is_storm=_b(r["is_storm"]),
+        enabled=bool(r["enabled"]),
+        created_at=int(r["created_at"]),
     )
 
 
@@ -67,7 +74,9 @@ class FissurePoller:
             return
         subs_raw = await self.repo.list_fissure_subscriptions(enabled_only=True)
         if not subs_raw:
-            await self.repo.prune_fissure_notifications(older_than=t - NOTIFICATION_TTL_S)
+            await self.repo.prune_fissure_notifications(
+                older_than=t - NOTIFICATION_TTL_S
+            )
             return
         subs = [_row_to_sub(r) for r in subs_raw]
         chats = await self.repo.list_telegram_chats()
@@ -76,7 +85,9 @@ class FissurePoller:
                 if not matches(f, sub):
                     continue
                 newly = await self.repo.record_fissure_notification(
-                    subscription_id=sub.id, fissure_id=f.id, ts=t,
+                    subscription_id=sub.id,
+                    fissure_id=f.id,
+                    ts=t,
                 )
                 if not newly:
                     continue

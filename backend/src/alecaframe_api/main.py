@@ -3,51 +3,35 @@
 Run with:
     uv run uvicorn alecaframe_api.main:app --reload
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import os
-import re
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
+import redis.asyncio as redis_lib
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
-
-import redis.asyncio as redis_lib
 
 from . import __version__
 from .bridge import AlecaBridge, BridgeError
 from .config import get_settings
-from .infra.cache import Cache
-from .naming import NameResolver
-from .wfm import dependencies as wfm_deps
-from .wfm.client import WFMClient
-from .wfm.auctions_client import WFMAuctionClient
-from .wfm.auction_poller import AuctionPoller
-from .wfm.router import router as wfm_router
-from .wfm.rivens_router import router as rivens_router
+from .db.repo import Repo
+from .fissures import dependencies as fissures_deps
 from .fissures.client import FissureClient
 from .fissures.poller import FissurePoller
-from .fissures.telegram import TelegramClient, TelegramBot
-from .fissures import dependencies as fissures_deps
 from .fissures.router import router as fissures_router
+from .fissures.telegram import TelegramBot, TelegramClient
 from .infra.broker import RabbitMQBus
+from .infra.cache import Cache
 from .infra.push import CentrifugoPublisher
-from .wfm.consumer import handle_live_order
-from .wfm.me_router import router as me_router
-from .wfm.price_poller import PricePoller
-from .wfm.price_store import PriceStore
-from .wfm.sets import SetComposition, SetIndex
-from .wfm.slugs import SlugResolver
-from .db.repo import Repo
+from .naming import NameResolver
 from .reference import stats_loader
 from .reference.nodes_loader import NodeCatalog
 from .reference.router import router as reference_router
-from .wfm.history_router import router as history_router
-from .wfm.recipe_uses import RecipeUse, load_recipe_uses
-from .wfm.sets_loader import load_set_compositions_from_aleca
 from .schemas import (
     ApiInfo,
     Currencies,
@@ -63,6 +47,21 @@ from .schemas import (
     StandingsResponse,
     SummaryResponse,
 )
+from .wfm import dependencies as wfm_deps
+from .wfm.auction_poller import AuctionPoller
+from .wfm.auctions_client import WFMAuctionClient
+from .wfm.client import WFMClient
+from .wfm.consumer import handle_live_order
+from .wfm.history_router import router as history_router
+from .wfm.me_router import router as me_router
+from .wfm.price_poller import PricePoller
+from .wfm.price_store import PriceStore
+from .wfm.recipe_uses import RecipeUse, load_recipe_uses
+from .wfm.rivens_router import router as rivens_router
+from .wfm.router import router as wfm_router
+from .wfm.sets import SetComposition, SetIndex
+from .wfm.sets_loader import load_set_compositions_from_aleca
+from .wfm.slugs import SlugResolver
 
 logging.basicConfig(
     level=os.getenv("ALECA_LOG_LEVEL", "INFO"),
@@ -120,14 +119,17 @@ async def lifespan(app: FastAPI):
 
     async def _token_provider() -> str:
         import httpx
+
         async with httpx.AsyncClient(timeout=5.0) as c:
             r = await c.get(f"{_settings.agent_url.rstrip('/')}/wfm-token")
             r.raise_for_status()
             return r.json()["token"]
 
     wfm_client = WFMClient(
-        cache=wfm_cache, base_url=_settings.wfm_base_url,
-        token_provider=_token_provider, platform=_settings.wfm_platform,
+        cache=wfm_cache,
+        base_url=_settings.wfm_base_url,
+        token_provider=_token_provider,
+        platform=_settings.wfm_platform,
         language=_settings.wfm_language,
         rate_limit_per_second=_settings.wfm_rate_limit_per_second,
     )
@@ -137,18 +139,26 @@ async def lifespan(app: FastAPI):
         items = await wfm_client.get_items()
         slug_resolver.load(items)
     except Exception as e:
-        log.warning("WFM /items bootstrap failed: %s; slug resolution will be empty until first /wfm/items call", e)
+        log.warning(
+            "WFM /items bootstrap failed: %s; slug resolution will be empty until first /wfm/items call",
+            e,
+        )
 
     # Load ad-hoc overrides from data/slug_overrides.json if it exists
     overrides_path = DATA_DIR / "slug_overrides.json"
     if overrides_path.exists():
         try:
             import json
-            with open(overrides_path, "r", encoding="utf-8") as f:
+
+            with open(overrides_path, encoding="utf-8") as f:
                 overrides = json.load(f)
                 if isinstance(overrides, dict):
                     slug_resolver.apply_overrides(overrides)
-                    log.info("loaded %d ad-hoc slug overrides from %s", len(overrides), overrides_path)
+                    log.info(
+                        "loaded %d ad-hoc slug overrides from %s",
+                        len(overrides),
+                        overrides_path,
+                    )
         except Exception as e:
             log.warning("failed to load slug overrides from %s: %s", overrides_path, e)
 
@@ -157,10 +167,17 @@ async def lifespan(app: FastAPI):
     # set compositions. Quantities match WFM v2 `quantityInSet` per part:
     #   kronen_prime_blade=2, kronen_prime_handle=2, kronen_prime_blueprint=1.
     # (Previous seed had handle=1, which under-counted missing parts by one.)
-    set_idx.register(SetComposition(
-        set_slug="kronen_prime_set", set_name="Kronen Prime Set",
-        parts={"kronen_prime_blade": 2, "kronen_prime_handle": 2, "kronen_prime_blueprint": 1},
-    ))
+    set_idx.register(
+        SetComposition(
+            set_slug="kronen_prime_set",
+            set_name="Kronen Prime Set",
+            parts={
+                "kronen_prime_blade": 2,
+                "kronen_prime_handle": 2,
+                "kronen_prime_blueprint": 1,
+            },
+        )
+    )
 
     # ----- DB + sets loader -----
     global repo
@@ -178,15 +195,21 @@ async def lifespan(app: FastAPI):
                 for part_slug, qty in comp.parts.items():
                     await repo.upsert_set_composition(comp.set_slug, part_slug, qty)
                 set_idx.register(comp)
-            log.info("loaded %d set compositions from AlecaFrame cachedData", len(loaded))
+            log.info(
+                "loaded %d set compositions from AlecaFrame cachedData", len(loaded)
+            )
         except Exception as e:
             log.warning("set composition load failed: %s", e)
     else:
         # Use DB copy. set_name is lost (not stored), so fall back to slug.
         for row in existing:
-            set_idx.register(SetComposition(
-                set_slug=row["set_slug"], set_name=row["set_slug"], parts=row["parts"],
-            ))
+            set_idx.register(
+                SetComposition(
+                    set_slug=row["set_slug"],
+                    set_name=row["set_slug"],
+                    parts=row["parts"],
+                )
+            )
         log.info("loaded %d set compositions from DB", len(existing))
 
     # ----- Base-stats reference (WFCD) -----
@@ -240,13 +263,17 @@ async def lifespan(app: FastAPI):
         v1_base = v1_base.rstrip("/") + "/v1"
     auctions_client = WFMAuctionClient(
         cache=Cache(client=redis_client, key_prefix="wfm-auc"),
-        base_url=v1_base, token_provider=_token_provider,
-        platform=_settings.wfm_platform, language=_settings.wfm_language,
+        base_url=v1_base,
+        token_provider=_token_provider,
+        platform=_settings.wfm_platform,
+        language=_settings.wfm_language,
         rate_limit_per_second=_settings.wfm_rate_limit_per_second,
     )
     global auction_poller
     auction_poller = AuctionPoller(
-        repo=repo, client=auctions_client, publisher=centrifugo,
+        repo=repo,
+        client=auctions_client,
+        publisher=centrifugo,
     )
     auction_poller_task = asyncio.create_task(auction_poller.run())
 
@@ -260,7 +287,8 @@ async def lifespan(app: FastAPI):
     if _settings.tg_api_key:
         telegram_client = TelegramClient(token=_settings.tg_api_key)
     fissure_poller = FissurePoller(
-        repo=repo, client=fissures_deps.fissure_client,
+        repo=repo,
+        client=fissures_deps.fissure_client,
         telegram=telegram_client,
         poll_interval=float(_settings.fissure_poll_interval_seconds),
     )
@@ -275,7 +303,9 @@ async def lifespan(app: FastAPI):
     _consumer_subscribed = {"v": False}
 
     async def _on_live_order(msg: dict) -> None:
-        await handle_live_order(msg=msg, cache=wfm_cache, publisher=centrifugo, repo=repo)
+        await handle_live_order(
+            msg=msg, cache=wfm_cache, publisher=centrifugo, repo=repo
+        )
 
     async def _try_subscribe() -> bool:
         try:
@@ -289,18 +319,22 @@ async def lifespan(app: FastAPI):
             return False
 
     # Try a few times at startup
-    for attempt in range(3):
+    for _attempt in range(3):
         if await _try_subscribe():
             break
         await asyncio.sleep(5)
     else:
-        log.warning("RabbitMQ unreachable after 3 attempts; scheduling background retry every 60s")
+        log.warning(
+            "RabbitMQ unreachable after 3 attempts; scheduling background retry every 60s"
+        )
+
         async def _retry_loop() -> None:
             while not _consumer_subscribed["v"]:
                 await asyncio.sleep(60)
                 if await _try_subscribe():
                     log.info("RabbitMQ connected on retry; consumer live")
                     break
+
         asyncio.create_task(_retry_loop())
 
     try:
@@ -318,7 +352,13 @@ async def lifespan(app: FastAPI):
     base_stats_task.cancel()
     if telegram_bot_task is not None:
         telegram_bot_task.cancel()
-    for task in (price_poller_task, auction_poller_task, fissure_poller_task, telegram_bot_task, base_stats_task):
+    for task in (
+        price_poller_task,
+        auction_poller_task,
+        fissure_poller_task,
+        telegram_bot_task,
+        base_stats_task,
+    ):
         if task is None:
             continue
         try:
@@ -398,8 +438,10 @@ def _enrich_list(items: list[dict[str, Any]], rs: NameResolver) -> list[ItemEntr
                 extra={
                     k: v
                     for k, v in it.items()
-                    if k not in {"ItemType", "ItemCount", "XP", "ItemId"} and v not in (None, "", [])
-                } or None,
+                    if k not in {"ItemType", "ItemCount", "XP", "ItemId"}
+                    and v not in (None, "", [])
+                }
+                or None,
             )
         )
     return out
@@ -418,7 +460,9 @@ def _extract_oid(v: Any) -> str | None:
 
 @app.get("/", response_model=ApiInfo, summary="Service info & endpoint list")
 async def index() -> ApiInfo:
-    routes = sorted({r.path for r in app.routes if getattr(r, "include_in_schema", False)})
+    routes = sorted(
+        {r.path for r in app.routes if getattr(r, "include_in_schema", False)}
+    )
     return ApiInfo(version=__version__, endpoints=routes)
 
 
@@ -433,7 +477,9 @@ async def healthz(br: BridgeDep) -> HealthResponse:
     )
 
 
-@app.post("/refresh", response_model=RefreshResponse, summary="Force-decrypt the .dat files")
+@app.post(
+    "/refresh", response_model=RefreshResponse, summary="Force-decrypt the .dat files"
+)
 async def refresh(br: BridgeDep) -> RefreshResponse:
     try:
         result = await br.refresh()
@@ -545,11 +591,16 @@ async def warframes(br: BridgeDep, rs: ResolverDep) -> ItemListResponse:
 async def weapons(
     br: BridgeDep,
     rs: ResolverDep,
-    slot: Annotated[str, Query(description=f"One of: {', '.join(_WEAPON_SLOTS)}")] = "primary",
+    slot: Annotated[
+        str, Query(description=f"One of: {', '.join(_WEAPON_SLOTS)}")
+    ] = "primary",
 ) -> ItemListResponse:
     key = _WEAPON_SLOTS.get(slot.lower())
     if key is None:
-        raise HTTPException(status_code=400, detail=f"unknown slot '{slot}'; try one of {sorted(_WEAPON_SLOTS)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"unknown slot '{slot}'; try one of {sorted(_WEAPON_SLOTS)}",
+        )
     data = await _safe_get_lastdata(br)
     src = data.get(key) or []
     items = _enrich_list(src, rs)
@@ -560,7 +611,9 @@ async def weapons(
 async def mods(
     br: BridgeDep,
     rs: ResolverDep,
-    q: Annotated[str | None, Query(description="case-insensitive substring of mod name")] = None,
+    q: Annotated[
+        str | None, Query(description="case-insensitive substring of mod name")
+    ] = None,
     limit: Annotated[int, Query(ge=1, le=2000)] = 200,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> ItemListResponse:
@@ -588,14 +641,20 @@ async def recipes(
     items = _enrich_list(data.get("Recipes") or [], rs)
     if q:
         needle = q.lower()
-        items = [it for it in items if needle in it.name.lower() or needle in it.unique_name.lower()]
+        items = [
+            it
+            for it in items
+            if needle in it.name.lower() or needle in it.unique_name.lower()
+        ]
     items.sort(key=lambda it: (it.name or "").lower())
     total = len(items)
     items = items[offset : offset + limit]
     return ItemListResponse(total=total, returned=len(items), items=items)
 
 
-@app.get("/misc", response_model=ItemListResponse, summary="MiscItems (resources + parts)")
+@app.get(
+    "/misc", response_model=ItemListResponse, summary="MiscItems (resources + parts)"
+)
 async def misc(
     br: BridgeDep,
     rs: ResolverDep,
@@ -608,11 +667,15 @@ async def misc(
     items = _enrich_list(data.get("MiscItems") or [], rs)
     if q:
         needle = q.lower()
-        items = [it for it in items if needle in it.name.lower() or needle in it.unique_name.lower()]
+        items = [
+            it
+            for it in items
+            if needle in it.name.lower() or needle in it.unique_name.lower()
+        ]
     if sort == "count_desc":
         items.sort(key=lambda it: -(it.count or 0))
     elif sort == "count_asc":
-        items.sort(key=lambda it: (it.count or 0))
+        items.sort(key=lambda it: it.count or 0)
     else:
         items.sort(key=lambda it: (it.name or "").lower())
     total = len(items)
@@ -726,7 +789,9 @@ async def raw(
     br: BridgeDep,
     path: Annotated[
         str | None,
-        Query(description="dotted/numeric path slice, e.g. `Suits.0` or `SeasonChallengeHistory`"),
+        Query(
+            description="dotted/numeric path slice, e.g. `Suits.0` or `SeasonChallengeHistory`"
+        ),
     ] = None,
 ) -> Any:
     data = await _safe_get_lastdata(br)
@@ -784,13 +849,21 @@ def _slice(data: Any, path: str) -> Any:
             try:
                 cur = cur[int(seg)]
             except (ValueError, IndexError) as e:
-                raise HTTPException(status_code=400, detail=f"bad path at '{seg}': {e}") from e
+                raise HTTPException(
+                    status_code=400, detail=f"bad path at '{seg}': {e}"
+                ) from e
         elif isinstance(cur, dict):
             if seg not in cur:
-                raise HTTPException(status_code=404, detail=f"no key '{seg}' (available: {sorted(cur)[:20]} ...)")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"no key '{seg}' (available: {sorted(cur)[:20]} ...)",
+                )
             cur = cur[seg]
         else:
-            raise HTTPException(status_code=400, detail=f"cannot descend into {type(cur).__name__} at '{seg}'")
+            raise HTTPException(
+                status_code=400,
+                detail=f"cannot descend into {type(cur).__name__} at '{seg}'",
+            )
     return cur
 
 
@@ -815,7 +888,10 @@ def _extract_date(v: Any) -> str | None:
             if ms is not None:
                 try:
                     import datetime as _dt
-                    return _dt.datetime.fromtimestamp(int(ms) / 1000, tz=_dt.UTC).isoformat()
+
+                    return _dt.datetime.fromtimestamp(
+                        int(ms) / 1000, tz=_dt.UTC
+                    ).isoformat()
                 except Exception:
                     return None
         if isinstance(d, str):

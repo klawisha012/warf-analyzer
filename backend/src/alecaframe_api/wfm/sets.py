@@ -8,10 +8,10 @@ estimate (~0.1p per part traded, rounded up).
 Set compositions for B.1a come from a hardcoded list. B.2 will read them from
 the AlecaFrame `cachedData/json/` files at startup.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-
 
 # Tax is no longer subtracted from set-build profit — at small parts counts
 # the 0.1p/part heuristic was producing a flat 1p that distorted profit
@@ -23,7 +23,7 @@ from dataclasses import dataclass
 class SetComposition:
     set_slug: str
     set_name: str
-    parts: dict[str, int]   # part_slug -> required quantity
+    parts: dict[str, int]  # part_slug -> required quantity
 
 
 @dataclass(frozen=True)
@@ -34,8 +34,8 @@ class SetProfitRow:
     parts_cost: int
     tax_estimate: int
     profit: int
-    missing_parts: dict[str, int]   # what you'd need to buy to complete
-    owned_parts: dict[str, int]     # what you already have (subset of parts)
+    missing_parts: dict[str, int]  # what you'd need to buy to complete
+    owned_parts: dict[str, int]  # what you already have (subset of parts)
 
 
 class SetIndex:
@@ -57,9 +57,9 @@ class SetIndex:
 def compute_set_profits(
     *,
     index: SetIndex,
-    inventory: dict[str, int],           # part_slug -> qty owned
+    inventory: dict[str, int],  # part_slug -> qty owned
     part_floor_prices: dict[str, int | None],
-    set_prices: dict[str, int | None],   # set_slug -> WFM floor for full set
+    set_prices: dict[str, int | None],  # set_slug -> WFM floor for full set
     min_margin: int = 0,
 ) -> list[SetProfitRow]:
     """Return profit rows for every registered set, sorted by profit desc."""
@@ -67,7 +67,7 @@ def compute_set_profits(
     for comp in index.all_sets():
         set_price = set_prices.get(comp.set_slug)
         if set_price is None:
-            continue   # can't compute without set floor
+            continue  # can't compute without set floor
         # Verify every required part has a floor price.
         if any(part_floor_prices.get(p) is None for p in comp.parts):
             continue
@@ -90,11 +90,18 @@ def compute_set_profits(
         if profit < min_margin:
             continue
 
-        rows.append(SetProfitRow(
-            set_slug=comp.set_slug, set_name=comp.set_name,
-            set_price=set_price, parts_cost=cost, tax_estimate=0,
-            profit=profit, missing_parts=missing, owned_parts=owned,
-        ))
+        rows.append(
+            SetProfitRow(
+                set_slug=comp.set_slug,
+                set_name=comp.set_name,
+                set_price=set_price,
+                parts_cost=cost,
+                tax_estimate=0,
+                profit=profit,
+                missing_parts=missing,
+                owned_parts=owned,
+            )
+        )
 
     rows.sort(key=lambda r: (-r.profit, r.set_slug))
     return rows

@@ -1,28 +1,31 @@
 """Unit tests for the WFCD base-stats normalizers (pure, no network)."""
+
 from __future__ import annotations
 
 from alecaframe_api.reference.stats_loader import (
     WFCD_FILES,
-    build_rows,
     _norm_frame,
     _norm_weapon,
+    build_rows,
 )
 
 
 def test_build_rows_frame_maps_core_fields() -> None:
-    items = [{
-        "name": "Ash",
-        "uniqueName": "/Lotus/Powersuits/Ninja/Ninja",
-        "masteryReq": 0,
-        "health": 455,
-        "shield": 270,
-        "armor": 105,
-        "power": 100,
-        "sprintSpeed": 1.15,
-        "polarities": ["madurai", "naramon"],
-        "abilities": [{"name": "Shuriken"}, {"name": "Smoke Screen"}],
-        "isPrime": False,
-    }]
+    items = [
+        {
+            "name": "Ash",
+            "uniqueName": "/Lotus/Powersuits/Ninja/Ninja",
+            "masteryReq": 0,
+            "health": 455,
+            "shield": 270,
+            "armor": 105,
+            "power": 100,
+            "sprintSpeed": 1.15,
+            "polarities": ["madurai", "naramon"],
+            "abilities": [{"name": "Shuriken"}, {"name": "Smoke Screen"}],
+            "isPrime": False,
+        }
+    ]
     rows = build_rows("warframe", items, _norm_frame)
     assert len(rows) == 1
     r = rows[0]
@@ -39,30 +42,32 @@ def test_build_rows_frame_maps_core_fields() -> None:
 
 
 def test_build_rows_weapon_maps_and_rounds() -> None:
-    items = [{
-        "name": "Acceltra",
-        "uniqueName": "/Lotus/Weapons/Tenno/LongGuns/SapientPrimary/SapientPrimaryWeapon",
-        "masteryReq": 8,
-        "fireRate": 12.000001,          # WFCD float noise → rounded
-        "magazineSize": 48,
-        "reloadTime": 2,
-        "accuracy": 23.529411,
-        "multishot": 1,
-        "criticalChance": 0.31999999,
-        "criticalMultiplier": 2.8,
-        "procChance": 0.060000002,
-        "totalDamage": 70,
-        "damage": {"impact": 26, "puncture": 35.2, "slash": 8.8, "heat": 0},
-        "trigger": "Auto",
-        "slot": 0,
-        "disposition": 0.7,
-    }]
+    items = [
+        {
+            "name": "Acceltra",
+            "uniqueName": "/Lotus/Weapons/Tenno/LongGuns/SapientPrimary/SapientPrimaryWeapon",
+            "masteryReq": 8,
+            "fireRate": 12.000001,  # WFCD float noise → rounded
+            "magazineSize": 48,
+            "reloadTime": 2,
+            "accuracy": 23.529411,
+            "multishot": 1,
+            "criticalChance": 0.31999999,
+            "criticalMultiplier": 2.8,
+            "procChance": 0.060000002,
+            "totalDamage": 70,
+            "damage": {"impact": 26, "puncture": 35.2, "slash": 8.8, "heat": 0},
+            "trigger": "Auto",
+            "slot": 0,
+            "disposition": 0.7,
+        }
+    ]
     rows = build_rows("primary", items, _norm_weapon)
     r = rows[0]
     assert r["mastery_req"] == 8
     assert r["disposition"] == 0.7
     s = r["stats"]
-    assert s["fire_rate"] == 12.0           # rounded from 12.000001
+    assert s["fire_rate"] == 12.0  # rounded from 12.000001
     assert s["crit_chance"] == 0.32
     assert s["status_chance"] == 0.06
     assert s["magazine"] == 48
@@ -75,15 +80,17 @@ def test_build_rows_weapon_captures_omega_attenuation_and_type() -> None:
     # (Torid=1.3), while `disposition` is the cosmetic 1-5 dot-rank. The scorer
     # needs the multiplier; `type` is needed to down-weight multishot on
     # beam/AoE weapons (e.g. Launcher).
-    items = [{
-        "name": "Torid",
-        "uniqueName": "/Lotus/Weapons/ClanTech/Bio/BioWeapon",
-        "criticalChance": 0.15,
-        "disposition": 4,
-        "omegaAttenuation": 1.2999999,   # float noise → rounded
-        "type": "Launcher",
-        "trigger": "Semi",
-    }]
+    items = [
+        {
+            "name": "Torid",
+            "uniqueName": "/Lotus/Weapons/ClanTech/Bio/BioWeapon",
+            "criticalChance": 0.15,
+            "disposition": 4,
+            "omegaAttenuation": 1.2999999,  # float noise → rounded
+            "type": "Launcher",
+            "trigger": "Semi",
+        }
+    ]
     s = build_rows("primary", items, _norm_weapon)[0]["stats"]
     assert s["omega_attenuation"] == 1.3
     assert s["type"] == "Launcher"

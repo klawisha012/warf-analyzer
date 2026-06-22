@@ -1,13 +1,11 @@
 """Tests for order-book aggregation functions."""
+
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
-import pytest
-
+from alecaframe_api.wfm.prices import compute_stats
 from tests import FIXTURES_DIR
-from alecaframe_api.wfm.prices import compute_stats, OrderBookStats
 
 FIXTURE = FIXTURES_DIR / "wfm_orders_kronen_prime_blade.json"
 
@@ -67,15 +65,39 @@ def test_compute_stats_top5_attached() -> None:
 def test_compute_stats_percentiles_are_monotonic() -> None:
     orders = load_orders()
     stats = compute_stats(orders, side="sell", online_only=False)
-    assert stats.p10 is not None and stats.p25 is not None and stats.p75 is not None and stats.p90 is not None
-    assert stats.min_price <= stats.p10 <= stats.p25 <= stats.median <= stats.p75 <= stats.p90 <= stats.max_price
+    assert (
+        stats.p10 is not None
+        and stats.p25 is not None
+        and stats.p75 is not None
+        and stats.p90 is not None
+    )
+    assert (
+        stats.min_price
+        <= stats.p10
+        <= stats.p25
+        <= stats.median
+        <= stats.p75
+        <= stats.p90
+        <= stats.max_price
+    )
 
 
 def test_compute_stats_handles_non_pc_platform_filter() -> None:
     """If the fixture had xbox orders mixed in, the helper should accept a platform filter."""
     orders = load_orders() + [
-        {"id": "x", "type": "sell", "platinum": 999, "quantity": 1, "visible": True,
-         "user": {"ingameName": "xbox_a", "status": "online", "reputation": 0, "platform": "xbox"}},
+        {
+            "id": "x",
+            "type": "sell",
+            "platinum": 999,
+            "quantity": 1,
+            "visible": True,
+            "user": {
+                "ingameName": "xbox_a",
+                "status": "online",
+                "reputation": 0,
+                "platform": "xbox",
+            },
+        },
     ]
     stats = compute_stats(orders, side="sell", online_only=False, platform="pc")
     assert stats.max_price == 60  # xbox 999 not counted

@@ -3,6 +3,7 @@
 All env vars share the `ALECA_` prefix and are case-insensitive.
 Loaded once at process start; values are immutable.
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -44,7 +45,9 @@ class Settings(BaseSettings):
     # `env_prefix="ALECA_"` would otherwise turn this field into
     # `ALECA_ALECA_DATA_HOME`. Override the alias so the public env var is the
     # intuitive `ALECA_DATA_HOME` (matches what docker-compose sets).
-    aleca_data_home: Path | None = Field(default=None, validation_alias="ALECA_DATA_HOME")
+    aleca_data_home: Path | None = Field(
+        default=None, validation_alias="ALECA_DATA_HOME"
+    )
 
     # behaviour
     ttl_seconds: int = 60

@@ -1,4 +1,5 @@
 """Pydantic response schemas for the public API."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -104,7 +105,7 @@ class ApiInfo(BaseModel):
 
 
 class OrderRow(BaseModel):
-    side: str           # "sell" | "buy"
+    side: str  # "sell" | "buy"
     price: int
     qty: int
     user: str
@@ -140,6 +141,7 @@ class OrderBookResponse(BaseModel):
 
 class ItemUseRef(BaseModel):
     """An item that uses some other item as a component in its recipe."""
+
     name: str
     unique_name: str
     count: int
@@ -174,6 +176,7 @@ class PricedItemListResponse(BaseModel):
 
 class ItemBaseStats(BaseModel):
     """Base (unmodded) reference stats for one item/warframe, from WFCD."""
+
     unique_name: str
     category: str | None = None
     name: str | None = None
@@ -227,7 +230,7 @@ class RelistNudgeRow(BaseModel):
     your_price: int
     median: int | None
     top5: list[int]
-    suggestion: str   # e.g. "raise to 36" / "lower to 33"
+    suggestion: str  # e.g. "raise to 36" / "lower to 33"
 
 
 class RelistNudgeResponse(BaseModel):
@@ -284,7 +287,7 @@ class RivenAuctionRow(BaseModel):
     mod_rank: int | None = None
     polarity: str | None = None
     owner_name: str | None = None
-    owner_status: str | None = None         # 'ingame' | 'online' | 'offline'
+    owner_status: str | None = None  # 'ingame' | 'online' | 'offline'
     tier: str
     attributes: list[RivenAuctionAttribute] = []
     # Weapon-aware quality score (base profile in M1). `grade`/`score` are null
@@ -334,8 +337,8 @@ class RivenAuctionsResponse(BaseModel):
     weapon_slug: str
     fetched_at: str
     stale: bool = False
-    tiers: dict[str, list[RivenAuctionRow]]      # 'god' | 'mid' | 'low'
-    stats: list[RivenTierStats]                  # one per tier + 'all'
+    tiers: dict[str, list[RivenAuctionRow]]  # 'god' | 'mid' | 'low'
+    stats: list[RivenTierStats]  # one per tier + 'all'
     outliers: list[RivenOutlier]
     top_attributes: list[RivenTopAttribute]
     strategies: list[RivenStrategyTip]

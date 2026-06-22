@@ -1,4 +1,5 @@
 """WFMAuctionClient tests — v1 /auctions endpoints, auth, cache, stale fallback."""
+
 from __future__ import annotations
 
 import pytest
@@ -11,6 +12,7 @@ from alecaframe_api.wfm.auctions_client import WFMAuctionClient, WFMAuctionError
 @pytest.fixture
 async def cache() -> Cache:
     import fakeredis.aioredis
+
     client = fakeredis.aioredis.FakeRedis(decode_responses=True)
     c = Cache(client=client, key_prefix="wfm-auc")
     yield c
@@ -21,6 +23,7 @@ async def cache() -> Cache:
 def token():
     async def _t() -> str:
         return "FAKE.JWT.TOKEN"
+
     return _t
 
 
@@ -37,22 +40,52 @@ def client_factory(cache: Cache, token):
         )
         kwargs.update(overrides)
         return WFMAuctionClient(**kwargs)
+
     return _factory
 
 
 @pytest.mark.asyncio
-async def test_get_riven_auctions_sends_auth_and_filters(client_factory, httpx_mock: HTTPXMock) -> None:
+async def test_get_riven_auctions_sends_auth_and_filters(
+    client_factory, httpx_mock: HTTPXMock
+) -> None:
     httpx_mock.add_response(
         url="https://mock.wfm.test/v1/auctions/search?type=riven&weapon_url_name=tonkor&sort_by=price_asc",
         method="GET",
-        json={"payload": {"auctions": [
-            {"id": "a1", "buyout_price": 200, "starting_price": 50, "top_bid": None,
-             "item": {"weapon_url_name": "tonkor", "polarity": "vazarin",
-                      "attributes": [{"url_name": "critical_damage", "value": 120, "positive": True}],
-                      "mod_rank": 8, "re_rolls": 4, "mastery_level": 12, "name": "rivenname"},
-             "owner": {"ingame_name": "user", "status": "ingame", "platform": "pc"},
-             "visible": True, "private": False, "is_direct_sell": True},
-        ]}},
+        json={
+            "payload": {
+                "auctions": [
+                    {
+                        "id": "a1",
+                        "buyout_price": 200,
+                        "starting_price": 50,
+                        "top_bid": None,
+                        "item": {
+                            "weapon_url_name": "tonkor",
+                            "polarity": "vazarin",
+                            "attributes": [
+                                {
+                                    "url_name": "critical_damage",
+                                    "value": 120,
+                                    "positive": True,
+                                }
+                            ],
+                            "mod_rank": 8,
+                            "re_rolls": 4,
+                            "mastery_level": 12,
+                            "name": "rivenname",
+                        },
+                        "owner": {
+                            "ingame_name": "user",
+                            "status": "ingame",
+                            "platform": "pc",
+                        },
+                        "visible": True,
+                        "private": False,
+                        "is_direct_sell": True,
+                    },
+                ]
+            }
+        },
     )
     c = client_factory()
     auctions = await c.get_riven_auctions("tonkor")
@@ -79,7 +112,9 @@ async def test_get_riven_auctions_cached(client_factory, httpx_mock: HTTPXMock) 
 
 
 @pytest.mark.asyncio
-async def test_get_riven_auctions_stale_fallback(client_factory, httpx_mock: HTTPXMock) -> None:
+async def test_get_riven_auctions_stale_fallback(
+    client_factory, httpx_mock: HTTPXMock
+) -> None:
     """WFM 5xx after a successful cached fetch → return stale + flag."""
     httpx_mock.add_response(
         url="https://mock.wfm.test/v1/auctions/search?type=riven&weapon_url_name=tonkor&sort_by=price_asc",
@@ -93,7 +128,8 @@ async def test_get_riven_auctions_stale_fallback(client_factory, httpx_mock: HTT
     httpx_mock.add_response(
         url="https://mock.wfm.test/v1/auctions/search?type=riven&weapon_url_name=tonkor&sort_by=price_asc",
         method="GET",
-        status_code=503, text="boom",
+        status_code=503,
+        text="boom",
     )
     # Force fresh — should fallback to stale instead of raising.
     second = await c.get_riven_auctions("tonkor", fresh=True)
@@ -103,12 +139,15 @@ async def test_get_riven_auctions_stale_fallback(client_factory, httpx_mock: HTT
 
 
 @pytest.mark.asyncio
-async def test_get_riven_auctions_raises_on_first_failure(client_factory, httpx_mock: HTTPXMock) -> None:
+async def test_get_riven_auctions_raises_on_first_failure(
+    client_factory, httpx_mock: HTTPXMock
+) -> None:
     """No cache + WFM fails → WFMAuctionError."""
     httpx_mock.add_response(
         url="https://mock.wfm.test/v1/auctions/search?type=riven&weapon_url_name=tonkor&sort_by=price_asc",
         method="GET",
-        status_code=503, text="boom",
+        status_code=503,
+        text="boom",
     )
     c = client_factory()
     with pytest.raises(WFMAuctionError):
@@ -116,7 +155,9 @@ async def test_get_riven_auctions_raises_on_first_failure(client_factory, httpx_
 
 
 @pytest.mark.asyncio
-async def test_get_auction_entry_returns_payload(client_factory, httpx_mock: HTTPXMock) -> None:
+async def test_get_auction_entry_returns_payload(
+    client_factory, httpx_mock: HTTPXMock
+) -> None:
     httpx_mock.add_response(
         url="https://mock.wfm.test/v1/auctions/entry/abc123",
         method="GET",

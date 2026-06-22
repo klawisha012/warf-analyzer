@@ -3,6 +3,7 @@
 A malformed or out-of-range curated value must fail HERE (a red test), never
 reach production as a confidently-wrong Incarnon grade.
 """
+
 from __future__ import annotations
 
 import datetime as _dt
@@ -59,21 +60,30 @@ def test_curated_weapons_are_in_the_known_roster() -> None:
 def test_validator_rejects_percent_scale_crit_chance() -> None:
     with pytest.raises(ValidationError):
         IncarnonProfile(
-            weapon_name="Bad", weapon_type="Rifle",
+            weapon_name="Bad",
+            weapon_type="Rifle",
             crit_chance=29.0,  # percent, not fraction → out of [0,1]
-            crit_damage=3.0, status_chance=0.3,
-            evolution_build="x", source_url="https://example.com",
-            entered_date=_dt.date(2026, 6, 22), game_version="x",
+            crit_damage=3.0,
+            status_chance=0.3,
+            evolution_build="x",
+            source_url="https://example.com",
+            entered_date=_dt.date(2026, 6, 22),
+            game_version="x",
         )
 
 
 def test_validator_rejects_non_http_source() -> None:
     with pytest.raises(ValidationError):
         IncarnonProfile(
-            weapon_name="Bad", weapon_type="Rifle",
-            crit_chance=0.3, crit_damage=3.0, status_chance=0.3,
-            evolution_build="x", source_url="not-a-url",
-            entered_date=_dt.date(2026, 6, 22), game_version="x",
+            weapon_name="Bad",
+            weapon_type="Rifle",
+            crit_chance=0.3,
+            crit_damage=3.0,
+            status_chance=0.3,
+            evolution_build="x",
+            source_url="not-a-url",
+            entered_date=_dt.date(2026, 6, 22),
+            game_version="x",
         )
 
 
@@ -81,11 +91,15 @@ def test_validator_rejects_unknown_field() -> None:
     # extra="forbid": a typo'd field name is a load error, not a silent drop.
     with pytest.raises(ValidationError):
         IncarnonProfile(
-            weapon_name="Bad", weapon_type="Rifle",
+            weapon_name="Bad",
+            weapon_type="Rifle",
             crit_chancee=0.3,  # typo
-            crit_damage=3.0, status_chance=0.3,
-            evolution_build="x", source_url="https://example.com",
-            entered_date=_dt.date(2026, 6, 22), game_version="x",
+            crit_damage=3.0,
+            status_chance=0.3,
+            evolution_build="x",
+            source_url="https://example.com",
+            entered_date=_dt.date(2026, 6, 22),
+            game_version="x",
         )
 
 

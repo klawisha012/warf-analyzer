@@ -8,11 +8,27 @@ def test_build_nodes_by_planet_groups_sorts_dedupes_and_skips_junk() -> None:
     # SolNodeN, each {value: "<Node> (<Planet>)", enemy, type}. Entries with no
     # parenthesised planet (e.g. SolNode0) are not real star-chart nodes.
     sample = {
-        "SolNode0": {"value": "SolNode0", "enemy": "Sentient", "type": "Ancient Retribution"},
-        "SolNode1": {"value": "Galatea (Neptune)", "enemy": "Corpus", "type": "Capture"},
+        "SolNode0": {
+            "value": "SolNode0",
+            "enemy": "Sentient",
+            "type": "Ancient Retribution",
+        },
+        "SolNode1": {
+            "value": "Galatea (Neptune)",
+            "enemy": "Corpus",
+            "type": "Capture",
+        },
         "SolNode2": {"value": "Kappa (Sedna)", "enemy": "Grineer", "type": "Survival"},
-        "SolNode3": {"value": "Adaro (Sedna)", "enemy": "Grineer", "type": "Exterminate"},
-        "SolNode4": {"value": "Adaro (Sedna)", "enemy": "Grineer", "type": "Exterminate"},
+        "SolNode3": {
+            "value": "Adaro (Sedna)",
+            "enemy": "Grineer",
+            "type": "Exterminate",
+        },
+        "SolNode4": {
+            "value": "Adaro (Sedna)",
+            "enemy": "Grineer",
+            "type": "Exterminate",
+        },
     }
     out = build_nodes_by_planet(sample)
 

@@ -1,4 +1,5 @@
 """Tests for the HTTP-bridge backend reading agent-decrypted JSON from disk."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -40,7 +41,8 @@ async def test_refresh_agent_down_raises(
 ) -> None:
     httpx_mock.add_exception(
         httpx.ConnectError("connection refused"),
-        url="http://agent.test/refresh", method="POST",
+        url="http://agent.test/refresh",
+        method="POST",
     )
     br = AlecaBridge(agent_url="http://agent.test", data_dir=tmp_data_dir)
     with pytest.raises(BridgeError):
@@ -63,13 +65,16 @@ async def test_lastdata_unwraps_mission_completion_wrapper(tmp_path: Path) -> No
     the real inventory as a JSON-string under the InventoryJson key.
     """
     import json
+
     data_dir = tmp_path / "data"
     data_dir.mkdir()
     real_inventory = {
         "PremiumCredits": 169,
         "RegularCredits": 32_539_253,
         "Suits": [{"ItemType": "/Lotus/Powersuits/Cowgirl/MesaPrime", "XP": 1}],
-        "MiscItems": [{"ItemType": "/Lotus/Types/Items/Misc/Rubedo", "ItemCount": 10000}],
+        "MiscItems": [
+            {"ItemType": "/Lotus/Types/Items/Misc/Rubedo", "ItemCount": 10000}
+        ],
         "Recipes": [],
     }
     wrapper = {
@@ -79,7 +84,9 @@ async def test_lastdata_unwraps_mission_completion_wrapper(tmp_path: Path) -> No
         "InventoryJson": json.dumps(real_inventory),
     }
     (data_dir / "lastData.json").write_text(json.dumps(wrapper), encoding="utf-8")
-    (data_dir / "_meta.json").write_text('{"meta":{"wfm_username":"x"}}', encoding="utf-8")
+    (data_dir / "_meta.json").write_text(
+        '{"meta":{"wfm_username":"x"}}', encoding="utf-8"
+    )
 
     br = AlecaBridge(agent_url="http://agent.invalid", data_dir=data_dir)
     br.reload_from_disk(force=True)

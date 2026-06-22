@@ -6,13 +6,14 @@ handler. Reconnects on disconnect with exponential backoff.
 
 This file is consumed by the poller; backend never imports it.
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
 import random
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 import websockets
 
@@ -48,15 +49,25 @@ class WFMSocketClient:
                 token = await self._token_provider()
                 url = f"{self._base_ws}?platform={self._platform}"
                 headers = {"Cookie": f"JWT={token}; platform={self._platform}"}
-                async with websockets.connect(url, additional_headers=headers, ping_interval=20) as ws:
+                async with websockets.connect(
+                    url, additional_headers=headers, ping_interval=20
+                ) as ws:
                     connected_at = asyncio.get_event_loop().time()
                     # Subscribe to current slug set.
                     for slug in list(self._slugs):
-                        await ws.send(json.dumps({
-                            "type": "@WS/SUBSCRIBE/NEW_ORDERS", "payload": slug,
-                        }))
+                        await ws.send(
+                            json.dumps(
+                                {
+                                    "type": "@WS/SUBSCRIBE/NEW_ORDERS",
+                                    "payload": slug,
+                                }
+                            )
+                        )
                     async for raw in ws:
-                        if backoff != 1.0 and (asyncio.get_event_loop().time() - connected_at) > 30:
+                        if (
+                            backoff != 1.0
+                            and (asyncio.get_event_loop().time() - connected_at) > 30
+                        ):
                             # Stable for 30s — safe to reset backoff.
                             backoff = 1.0
                         try:
@@ -64,7 +75,9 @@ class WFMSocketClient:
                         except Exception:
                             continue
                         # WFM sends @WS/SUBSCRIBE/NEW_ORDERS responses, plus order events.
-                        if msg.get("type", "").endswith("/UPDATE") or msg.get("type", "").endswith("/CREATED"):
+                        if msg.get("type", "").endswith("/UPDATE") or msg.get(
+                            "type", ""
+                        ).endswith("/CREATED"):
                             await handler(msg)
             except Exception as e:
                 if self._stop.is_set():

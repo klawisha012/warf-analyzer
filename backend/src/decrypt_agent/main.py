@@ -15,6 +15,7 @@ Configuration via env vars:
   AGENT_TOKEN_FILE           (default: %LOCALAPPDATA%/AlecaFrame/WFMarketToken.tk)
   AGENT_PWSH                 (default: pwsh)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -23,7 +24,10 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import pystray  # win32-only optional dep; used only in return-type annotation
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -71,14 +75,24 @@ class RefreshResult(BaseModel):
 # ------------------------------------------------------------------ logic
 
 
-async def _run_dump_script(script_path: Path, out_dir: Path, pwsh: str) -> dict[str, Any]:
+async def _run_dump_script(
+    script_path: Path, out_dir: Path, pwsh: str
+) -> dict[str, Any]:
     """Spawn pwsh + dump_inventory.ps1, return parsed JSON status."""
     if not script_path.exists():
         raise RuntimeError(f"script not found: {script_path}")
     proc = await asyncio.create_subprocess_exec(
-        pwsh, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-        "-File", str(script_path), "-OutDir", str(out_dir),
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        pwsh,
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(script_path),
+        "-OutDir",
+        str(out_dir),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
     )
     stdout_b, stderr_b = await proc.communicate()
     stdout = stdout_b.decode("utf-8-sig", errors="replace").strip()
@@ -105,11 +119,14 @@ async def _show_toast(req: ToastRequest) -> None:
     def _cb() -> None:
         if req.click_url:
             import webbrowser
+
             webbrowser.open(req.click_url)
 
     def _show() -> None:
         ToastNotifier().show_toast(
-            req.title, req.body, duration=req.duration,
+            req.title,
+            req.body,
+            duration=req.duration,
             callback_on_click=_cb if req.click_url else None,
             threaded=True,
         )
@@ -127,7 +144,8 @@ def build_app() -> FastAPI:
     out_dir.mkdir(parents=True, exist_ok=True)
     dump_script_str = os.getenv("AGENT_DUMP_SCRIPT")
     dump_script = (
-        Path(dump_script_str) if dump_script_str
+        Path(dump_script_str)
+        if dump_script_str
         else _project_root() / "scripts" / "dump_inventory.ps1"
     )
     token_file = _env_path("AGENT_TOKEN_FILE", _default_token_file())
@@ -186,7 +204,9 @@ app = build_app()
 # ------------------------------------------------------------------ tray + runner
 
 
-def _make_tray_icon(out_dir: Path, host: str) -> "pystray.Icon":
+def _make_tray_icon(
+    out_dir: Path, host: str
+) -> pystray.Icon:  # pystray imported inside body (win32-only optional dep)
     """Build a pystray icon. Returns the Icon instance (caller calls .run())."""
     import urllib.request
 
@@ -203,7 +223,8 @@ def _make_tray_icon(out_dir: Path, host: str) -> "pystray.Icon":
         try:
             urllib.request.urlopen(
                 f"http://{host}:{os.getenv('AGENT_PORT', '8788')}/refresh",
-                data=b"", timeout=30,
+                data=b"",
+                timeout=30,
             )
         except Exception as e:
             log.warning("manual refresh failed: %s", e)
@@ -239,7 +260,12 @@ def run() -> None:
     )
 
     def _serve() -> None:
-        uvicorn.run(app, host=host, port=port, log_level=os.getenv("AGENT_LOG_LEVEL", "info").lower())
+        uvicorn.run(
+            app,
+            host=host,
+            port=port,
+            log_level=os.getenv("AGENT_LOG_LEVEL", "info").lower(),
+        )
 
     server_thread = threading.Thread(target=_serve, daemon=True, name="agent-uvicorn")
     server_thread.start()

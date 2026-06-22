@@ -11,6 +11,7 @@ payload doesn't carry enough state for a full order-book stats row. The
 30-min REST-snapshot job in poller.py (Task 9) writes proper snapshots
 from /v1/items/{slug}/orders.
 """
+
 from __future__ import annotations
 
 import logging
@@ -28,7 +29,10 @@ class _PublisherProto(Protocol):
 
 
 async def handle_live_order(
-    *, msg: dict, cache: Cache, publisher: _PublisherProto,
+    *,
+    msg: dict,
+    cache: Cache,
+    publisher: _PublisherProto,
     repo: Repo | None = None,
 ) -> None:
     payload = msg.get("payload") or {}
@@ -45,8 +49,10 @@ async def handle_live_order(
     if repo is not None:
         try:
             await repo.append_live_event(
-                ts=int(time.time()), slug=slug,
-                event_type=str(msg.get("type") or ""), payload=msg,
+                ts=int(time.time()),
+                slug=slug,
+                event_type=str(msg.get("type") or ""),
+                payload=msg,
             )
         except Exception as e:
             log.warning("append_live_event failed for %s: %s", slug, e)

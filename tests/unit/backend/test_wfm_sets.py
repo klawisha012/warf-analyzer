@@ -1,9 +1,14 @@
 """Tests for set composition + profit calculator."""
+
 from __future__ import annotations
 
 import pytest
 
-from alecaframe_api.wfm.sets import SetIndex, SetComposition, compute_set_profits, SetProfitRow
+from alecaframe_api.wfm.sets import (
+    SetComposition,
+    SetIndex,
+    compute_set_profits,
+)
 
 
 @pytest.fixture
@@ -14,25 +19,29 @@ def index() -> SetIndex:
     Source: api.warframe.market/v2/items/{slug}.quantityInSet.
     """
     idx = SetIndex()
-    idx.register(SetComposition(
-        set_slug="kronen_prime_set",
-        set_name="Kronen Prime Set",
-        parts={
-            "kronen_prime_blade": 2,
-            "kronen_prime_handle": 2,
-            "kronen_prime_blueprint": 1,
-        },
-    ))
-    idx.register(SetComposition(
-        set_slug="mag_prime_set",
-        set_name="Mag Prime Set",
-        parts={
-            "mag_prime_neuroptics_blueprint": 1,
-            "mag_prime_chassis_blueprint": 1,
-            "mag_prime_systems_blueprint": 1,
-            "mag_prime_blueprint": 1,
-        },
-    ))
+    idx.register(
+        SetComposition(
+            set_slug="kronen_prime_set",
+            set_name="Kronen Prime Set",
+            parts={
+                "kronen_prime_blade": 2,
+                "kronen_prime_handle": 2,
+                "kronen_prime_blueprint": 1,
+            },
+        )
+    )
+    idx.register(
+        SetComposition(
+            set_slug="mag_prime_set",
+            set_name="Mag Prime Set",
+            parts={
+                "mag_prime_neuroptics_blueprint": 1,
+                "mag_prime_chassis_blueprint": 1,
+                "mag_prime_systems_blueprint": 1,
+                "mag_prime_blueprint": 1,
+            },
+        )
+    )
     return idx
 
 
@@ -64,19 +73,23 @@ def test_compute_set_profits_buyable_and_owned(index: SetIndex) -> None:
     set_floor_prices = {"kronen_prime_set": 100, "mag_prime_set": None}
 
     rows = compute_set_profits(
-        index=index, inventory=inventory_counts,
-        part_floor_prices=floor_prices, set_prices=set_floor_prices,
+        index=index,
+        inventory=inventory_counts,
+        part_floor_prices=floor_prices,
+        set_prices=set_floor_prices,
     )
 
     kronen = next(r for r in rows if r.set_slug == "kronen_prime_set")
     assert kronen.set_price == 100
-    assert kronen.parts_cost == 90     # 2 blades @35 + 1 handle @20
+    assert kronen.parts_cost == 90  # 2 blades @35 + 1 handle @20
     assert kronen.tax_estimate == 0
     assert kronen.profit == 100 - 90
     assert kronen.missing_parts == {"kronen_prime_blade": 2, "kronen_prime_handle": 1}
 
 
-def test_compute_set_profits_missing_when_user_has_zero_of_multi_qty_part(index: SetIndex) -> None:
+def test_compute_set_profits_missing_when_user_has_zero_of_multi_qty_part(
+    index: SetIndex,
+) -> None:
     """Regression for #handle-quantity bug: when a multi-qty part isn't owned at
     all, `missing_parts` must equal `required_qty`, not `required_qty - 1`.
     """
@@ -89,8 +102,10 @@ def test_compute_set_profits_missing_when_user_has_zero_of_multi_qty_part(index:
     set_prices = {"kronen_prime_set": 200}  # high enough not to be filtered
 
     rows = compute_set_profits(
-        index=index, inventory=inventory_counts,
-        part_floor_prices=floor_prices, set_prices=set_prices,
+        index=index,
+        inventory=inventory_counts,
+        part_floor_prices=floor_prices,
+        set_prices=set_prices,
     )
 
     kronen = next(r for r in rows if r.set_slug == "kronen_prime_set")
@@ -108,8 +123,10 @@ def test_compute_set_profits_skipped_when_no_set_price(index: SetIndex) -> None:
     floor_prices = {"mag_prime_blueprint": 30}
     set_prices = {"mag_prime_set": None}
     rows = compute_set_profits(
-        index=index, inventory=inventory_counts,
-        part_floor_prices=floor_prices, set_prices=set_prices,
+        index=index,
+        inventory=inventory_counts,
+        part_floor_prices=floor_prices,
+        set_prices=set_prices,
     )
     assert all(r.set_slug != "mag_prime_set" for r in rows)
 
@@ -120,8 +137,10 @@ def test_compute_set_profits_skipped_when_a_part_has_no_floor(index: SetIndex) -
     floor_prices = {"kronen_prime_blade": 35, "kronen_prime_handle": 20}  # missing bp
     set_prices = {"kronen_prime_set": 100}
     rows = compute_set_profits(
-        index=index, inventory=inventory_counts,
-        part_floor_prices=floor_prices, set_prices=set_prices,
+        index=index,
+        inventory=inventory_counts,
+        part_floor_prices=floor_prices,
+        set_prices=set_prices,
     )
     assert all(r.set_slug != "kronen_prime_set" for r in rows)
 
@@ -130,12 +149,17 @@ def test_compute_set_profits_filters_by_min_margin(index: SetIndex) -> None:
     """Pass min_margin=50 — Kronen yields only 29 so it should be filtered out."""
     inventory_counts = {}
     floor_prices = {
-        "kronen_prime_blade": 35, "kronen_prime_handle": 20, "kronen_prime_blueprint": 24,
+        "kronen_prime_blade": 35,
+        "kronen_prime_handle": 20,
+        "kronen_prime_blueprint": 24,
     }
     set_prices = {"kronen_prime_set": 100}
     rows = compute_set_profits(
-        index=index, inventory=inventory_counts,
-        part_floor_prices=floor_prices, set_prices=set_prices, min_margin=50,
+        index=index,
+        inventory=inventory_counts,
+        part_floor_prices=floor_prices,
+        set_prices=set_prices,
+        min_margin=50,
     )
     assert rows == []
 
@@ -146,7 +170,8 @@ def test_compute_set_profits_sorted_by_profit_desc(index: SetIndex) -> None:
     idx.register(SetComposition("a_set", "A Set", {"a_part": 1}))
     idx.register(SetComposition("b_set", "B Set", {"b_part": 1}))
     rows = compute_set_profits(
-        index=idx, inventory={},
+        index=idx,
+        inventory={},
         part_floor_prices={"a_part": 10, "b_part": 30},
         set_prices={"a_set": 50, "b_set": 80},
     )

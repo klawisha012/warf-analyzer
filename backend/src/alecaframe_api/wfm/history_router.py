@@ -1,4 +1,5 @@
 """History + signals endpoints. Read from the Repo singleton injected via Depends."""
+
 from __future__ import annotations
 
 import time
@@ -25,7 +26,10 @@ async def history(
         raise HTTPException(404, f"unknown slug '{slug}'")
     since = int(time.time()) - days * 86400
     rows = await repo.history(
-        slug=slug, side=side, online_only=int(online_only), since_ts=since,
+        slug=slug,
+        side=side,
+        online_only=int(online_only),
+        since_ts=since,
     )
     # Granularity downsampling: pick one row per bucket (newest in bucket wins).
     bucket = 3600 if granularity == "hour" else 86400
@@ -38,8 +42,12 @@ async def history(
         seen.add(b)
         out.append(r)
     return {
-        "slug": slug, "days": days, "granularity": granularity,
-        "side": side, "online_only": online_only, "rows": list(reversed(out)),
+        "slug": slug,
+        "days": days,
+        "granularity": granularity,
+        "side": side,
+        "online_only": online_only,
+        "rows": list(reversed(out)),
     }
 
 
@@ -63,7 +71,11 @@ async def signals_feed(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> dict[str, Any]:
     rows = await repo.recent_signals(since_ts=since, limit=limit)
-    return {"total": len(rows), "items": rows, "cursor_ts": rows[0]["ts"] if rows else None}
+    return {
+        "total": len(rows),
+        "items": rows,
+        "cursor_ts": rows[0]["ts"] if rows else None,
+    }
 
 
 @router.get("/me/dashboard-actions", summary="Top 10 ranked todo for the user")
@@ -75,9 +87,15 @@ async def dashboard_actions(
     since = int(time.time()) - 24 * 3600
     rows = await repo.recent_signals(since_ts=since, limit=200)
     priority = {
-        "bid_match": 100, "set_profit_window": 90, "competitor_undercut": 80,
-        "undervalued_mine": 70, "overpriced_mine": 60, "vault_premium": 55,
-        "floor_drop": 40, "momentum_up": 30, "volume_spike": 25,
+        "bid_match": 100,
+        "set_profit_window": 90,
+        "competitor_undercut": 80,
+        "undervalued_mine": 70,
+        "overpriced_mine": 60,
+        "vault_premium": 55,
+        "floor_drop": 40,
+        "momentum_up": 30,
+        "volume_spike": 25,
     }
     scored = sorted(rows, key=lambda r: -priority.get(r["signal_type"], 10))[:limit]
     return {"total": len(scored), "items": scored}

@@ -1,4 +1,5 @@
 """RabbitMQBus tests — producer publishes, consumer dispatches."""
+
 from __future__ import annotations
 
 import asyncio
@@ -19,13 +20,17 @@ async def test_publish_then_consume_roundtrip() -> None:
         received.append(msg)
 
     from alecaframe_api.infra.broker import _InMemoryBus
+
     fake = _InMemoryBus()
     bus._fake = fake
     bus._connected = True
 
     await bus.subscribe("wfm.live.orders", handler)
-    await bus.publish("wfm", "live.orders.kronen_prime_blade",
-                      {"slug": "kronen_prime_blade", "min_price": 35})
+    await bus.publish(
+        "wfm",
+        "live.orders.kronen_prime_blade",
+        {"slug": "kronen_prime_blade", "min_price": 35},
+    )
     await asyncio.sleep(0.05)
     assert received == [{"slug": "kronen_prime_blade", "min_price": 35}]
 
@@ -34,6 +39,7 @@ async def test_publish_then_consume_roundtrip() -> None:
 async def test_publish_serialises_json() -> None:
     bus = RabbitMQBus(url="amqp://fake")
     from alecaframe_api.infra.broker import _InMemoryBus
+
     fake = _InMemoryBus()
     bus._fake = fake
     bus._connected = True

@@ -13,6 +13,7 @@ Per tick:
 Errors from one weapon never abort the tick — they're logged and the next
 weapon proceeds.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -24,7 +25,9 @@ from alecaframe_api.db.repo import Repo
 from alecaframe_api.infra.push import CentrifugoPublisher
 from alecaframe_api.wfm.auctions_client import WFMAuctionClient, WFMAuctionError
 from alecaframe_api.wfm.rivens_analysis import (
-    classify_tiers, compute_tier_stats, detect_outliers,
+    classify_tiers,
+    compute_tier_stats,
+    detect_outliers,
 )
 
 log = logging.getLogger("alecaframe.wfm.auction_poller")
@@ -89,7 +92,9 @@ class AuctionPoller:
             owner = a.get("owner") or {}
             try:
                 await self.repo.upsert_riven_auction(
-                    auction_id=aid, weapon_slug=weapon_slug, seen_at=now,
+                    auction_id=aid,
+                    weapon_slug=weapon_slug,
+                    seen_at=now,
                     buyout_price=_int_or_none(a.get("buyout_price")),
                     starting_price=_int_or_none(a.get("starting_price")),
                     top_bid=_int_or_none(a.get("top_bid")),
@@ -105,7 +110,9 @@ class AuctionPoller:
                 log.warning("upsert auction %s failed: %s", aid, e)
         try:
             await self.repo.mark_riven_auctions_gone(
-                weapon_slug=weapon_slug, seen_ids=seen_ids, at=now,
+                weapon_slug=weapon_slug,
+                seen_ids=seen_ids,
+                at=now,
             )
         except Exception as e:
             log.warning("mark-gone for %s failed: %s", weapon_slug, e)
@@ -114,17 +121,30 @@ class AuctionPoller:
         await self._publish_outliers(weapon_slug, now, tiers)
 
     async def _snapshot(
-        self, weapon_slug: str, now: int, tier: str, auctions: list[dict],
+        self,
+        weapon_slug: str,
+        now: int,
+        tier: str,
+        auctions: list[dict],
     ) -> None:
         stats = compute_tier_stats(auctions)
         await self.repo.write_riven_snapshot(
-            weapon_slug=weapon_slug, ts=now, tier=tier,
-            count=stats.count, min_price=stats.min_price,
-            p25=stats.p25, median=stats.median, p75=stats.p75, max_price=stats.max_price,
+            weapon_slug=weapon_slug,
+            ts=now,
+            tier=tier,
+            count=stats.count,
+            min_price=stats.min_price,
+            p25=stats.p25,
+            median=stats.median,
+            p75=stats.p75,
+            max_price=stats.max_price,
         )
 
     async def _publish_outliers(
-        self, weapon_slug: str, now: int, tiers: dict[str, list[dict]],
+        self,
+        weapon_slug: str,
+        now: int,
+        tiers: dict[str, list[dict]],
     ) -> None:
         # Use the prior week's snapshots (excluding the one we just wrote)
         # so the comparison is against the rolling history, not our own
@@ -132,17 +152,26 @@ class AuctionPoller:
         since = now - HISTORICAL_WINDOW_S
         for tier_name in ("god", "mid", "low"):
             history = await self.repo.riven_snapshot_history(
-                weapon_slug=weapon_slug, tier=tier_name, since_ts=since,
+                weapon_slug=weapon_slug,
+                tier=tier_name,
+                since_ts=since,
             )
-            historical_medians = [r["median"] for r in history if r["median"] is not None and r["ts"] != now]
+            historical_medians = [
+                r["median"]
+                for r in history
+                if r["median"] is not None and r["ts"] != now
+            ]
             if not historical_medians:
                 continue
             # Median of medians — robust to outlier days.
             import statistics as _stats
+
             hist_median = int(_stats.median(historical_medians))
             outliers = detect_outliers(
-                tiers[tier_name], historical_median=hist_median,
-                threshold=self.outlier_threshold, tier=tier_name,
+                tiers[tier_name],
+                historical_median=hist_median,
+                threshold=self.outlier_threshold,
+                tier=tier_name,
             )
             for o in outliers:
                 try:
@@ -163,8 +192,11 @@ class AuctionPoller:
                     log.warning("publish outlier %s failed: %s", o.auction_id, e)
 
     async def run(self) -> None:
-        log.info("auction poller starting; interval=%.1fs threshold=%.2f",
-                 self.poll_interval, self.outlier_threshold)
+        log.info(
+            "auction poller starting; interval=%.1fs threshold=%.2f",
+            self.poll_interval,
+            self.outlier_threshold,
+        )
         while True:
             try:
                 await self.tick()

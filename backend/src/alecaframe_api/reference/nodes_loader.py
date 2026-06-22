@@ -4,6 +4,7 @@ WFCD publishes solNodes.json: {SolNodeN: {value: "<Node> (<Planet>)", enemy, typ
 We group node display names by planet so the UI can offer a planet-scoped node
 picker — letting a user subscribe to a node before any fissure is live there.
 Data: https://github.com/WFCD/warframe-worldstate-data (MIT)."""
+
 from __future__ import annotations
 
 import logging
@@ -15,9 +16,7 @@ import httpx
 
 log = logging.getLogger("alecaframe.reference.nodes_loader")
 
-_WFCD_SOLNODES_URL = (
-    "https://raw.githubusercontent.com/WFCD/warframe-worldstate-data/master/data/solNodes.json"
-)
+_WFCD_SOLNODES_URL = "https://raw.githubusercontent.com/WFCD/warframe-worldstate-data/master/data/solNodes.json"
 
 
 def _planet_of(value: str) -> str | None:
@@ -52,17 +51,22 @@ class NodeCatalog:
     """Fetches the WFCD solNodes catalogue once and caches it in-process. On a
     fetch error it returns the last good value (or {}), so callers degrade to
     live nodes rather than failing."""
+
     url: str = _WFCD_SOLNODES_URL
     timeout: float = 15.0
     cache_ttl: float = 24 * 3600.0
-    _cache: tuple[float, dict[str, list[str]]] | None = field(default=None, init=False, repr=False)
+    _cache: tuple[float, dict[str, list[str]]] | None = field(
+        default=None, init=False, repr=False
+    )
 
     async def get(self, *, now: float | None = None) -> dict[str, list[str]]:
         t = now if now is not None else time.time()
         if self._cache is not None and (t - self._cache[0]) < self.cache_ttl:
             return self._cache[1]
         try:
-            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as c:
+            async with httpx.AsyncClient(
+                timeout=self.timeout, follow_redirects=True
+            ) as c:
                 resp = await c.get(self.url, headers={"Accept": "application/json"})
             resp.raise_for_status()
             data = resp.json()

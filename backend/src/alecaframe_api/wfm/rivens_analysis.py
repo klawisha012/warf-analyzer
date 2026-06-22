@@ -17,6 +17,7 @@ of the same tier. Anything below `threshold × median` is flagged — that's
 a mod priced like a low-tier even though it's currently classified as mid
 (or a god-tier mod priced like a mid-tier, etc.).
 """
+
 from __future__ import annotations
 
 import statistics
@@ -27,6 +28,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class TierStats:
     """Distribution stats for one tier in one snapshot."""
+
     count: int
     min_price: int | None
     p25: int | None
@@ -38,40 +40,75 @@ class TierStats:
 @dataclass(frozen=True)
 class Outlier:
     """An auction priced significantly below the historical median of its tier."""
+
     auction_id: str
     tier: str
     price: int
     historical_median: int
-    discount_pct: int   # 100 * (1 - price/historical_median), rounded
+    discount_pct: int  # 100 * (1 - price/historical_median), rounded
 
 
 # Highly valued premium positive stats for weapons (rifles, pistols, shotguns, melee)
 GOD_POSITIVES = {
     # Offense / Crits
-    "multishot", "critical_damage", "critical_chance", "damage", "melee_damage",
+    "multishot",
+    "critical_damage",
+    "critical_chance",
+    "damage",
+    "melee_damage",
     # Elements (highly valued for combining viral/corrosive/heat)
-    "toxin", "cold", "heat", "electricity",
+    "toxin",
+    "cold",
+    "heat",
+    "electricity",
     # Melee meta / speeds
-    "range", "attack_speed", "fire_rate", "status_chance",
+    "range",
+    "attack_speed",
+    "fire_rate",
+    "status_chance",
     # Additional high tier
-    "slash", "elemental_damage", "critical_chance_on_slide"
+    "slash",
+    "elemental_damage",
+    "critical_chance_on_slide",
 }
 
 # Fatal negative curses that ruin the mod performance (making it trash/low-tier)
 FATAL_NEGATIVES = {
-    "damage", "melee_damage", "multishot", "critical_damage", "critical_chance",
-    "status_chance", "range", "attack_speed", "fire_rate", "slash",
+    "damage",
+    "melee_damage",
+    "multishot",
+    "critical_damage",
+    "critical_chance",
+    "status_chance",
+    "range",
+    "attack_speed",
+    "fire_rate",
+    "slash",
     # Negative elements also ruin viral/corrosive combos
-    "toxin", "cold", "heat", "electricity",
+    "toxin",
+    "cold",
+    "heat",
+    "electricity",
     # Negative faction damage is also fatal
-    "damage_to_grineer", "damage_to_corpus", "damage_to_infested"
+    "damage_to_grineer",
+    "damage_to_corpus",
+    "damage_to_infested",
 }
 
 # Harmless negatives that boost positive stats without hurting performance
 HARMLESS_NEGATIVES = {
-    "zoom", "maximum_ammo", "ammo_maximum", "magazine_capacity", "finisher_damage",
-    "slide_attack_critical_chance", "projectile_speed", "flight_speed",
-    "status_duration", "recoil", "impact", "puncture"
+    "zoom",
+    "maximum_ammo",
+    "ammo_maximum",
+    "magazine_capacity",
+    "finisher_damage",
+    "slide_attack_critical_chance",
+    "projectile_speed",
+    "flight_speed",
+    "status_duration",
+    "recoil",
+    "impact",
+    "puncture",
 }
 
 
@@ -96,7 +133,13 @@ def eval_riven_quality(a: dict) -> str | None:
     positives = []
     negatives = []
     for at in attributes:
-        name = (at.get("url_name") or at.get("name") or "").lower().strip().replace(" ", "_").replace("-", "_")
+        name = (
+            (at.get("url_name") or at.get("name") or "")
+            .lower()
+            .strip()
+            .replace(" ", "_")
+            .replace("-", "_")
+        )
         positive = bool(at.get("positive"))
         if positive:
             positives.append(name)
@@ -188,7 +231,9 @@ def classify_tiers(auctions: list[dict]) -> dict[str, list[dict]]:
 def compute_tier_stats(auctions: list[dict]) -> TierStats:
     prices = sorted(_buyout(a) for a in auctions if _buyout(a) is not None)
     if not prices:
-        return TierStats(count=0, min_price=None, p25=None, median=None, p75=None, max_price=None)
+        return TierStats(
+            count=0, min_price=None, p25=None, median=None, p75=None, max_price=None
+        )
     return TierStats(
         count=len(prices),
         min_price=prices[0],
@@ -211,8 +256,11 @@ def _quantile(sorted_prices: list[int], q: float) -> int | None:
 
 
 def detect_outliers(
-    auctions: list[dict], *, historical_median: int | None,
-    threshold: float, tier: str,
+    auctions: list[dict],
+    *,
+    historical_median: int | None,
+    threshold: float,
+    tier: str,
 ) -> list[Outlier]:
     """Auctions in this tier whose price is below threshold × median.
 
@@ -230,17 +278,22 @@ def detect_outliers(
         price = _buyout(a)
         if price is None or price >= cutoff:
             continue
-        out.append(Outlier(
-            auction_id=str(a.get("id") or ""),
-            tier=tier, price=price,
-            historical_median=historical_median,
-            discount_pct=int(round(100 * (1 - price / historical_median))),
-        ))
+        out.append(
+            Outlier(
+                auction_id=str(a.get("id") or ""),
+                tier=tier,
+                price=price,
+                historical_median=historical_median,
+                discount_pct=int(round(100 * (1 - price / historical_median))),
+            )
+        )
     return out
 
 
 def summarize_attributes(
-    auctions: list[dict], *, top_n: int = 5,
+    auctions: list[dict],
+    *,
+    top_n: int = 5,
 ) -> list[dict]:
     """Most common positive attribute names across `auctions` (typically the
     god-tier slice). Output: `[{name: 'critical_damage', count: 3, share: 1.0}]`
@@ -251,7 +304,7 @@ def summarize_attributes(
     total = 0
     for a in auctions:
         total += 1
-        attrs = ((a.get("item") or {}).get("attributes") or [])
+        attrs = (a.get("item") or {}).get("attributes") or []
         seen: set[str] = set()
         for at in attrs:
             if not at.get("positive"):
@@ -270,8 +323,11 @@ def summarize_attributes(
 
 
 def suggest_strategies(
-    *, outliers: list[Outlier], god_tier_count: int,
-    mid_tier_count: int, low_tier_count: int,
+    *,
+    outliers: list[Outlier],
+    god_tier_count: int,
+    mid_tier_count: int,
+    low_tier_count: int,
 ) -> list[dict]:
     """Translate the current market shape into actionable tips.
 
@@ -284,38 +340,46 @@ def suggest_strategies(
     # Buy-and-flip when there's any current outlier
     if outliers:
         best = max(outliers, key=lambda o: o.discount_pct)
-        tips.append({
-            "kind": "buy_flip",
-            "severity": "good",
-            "ru": f"Возможность: лот за {best.price}p (на {best.discount_pct}% ниже median {best.historical_median}p в tier '{best.tier}'). Купи и перевыставь ближе к median.",
-            "en": f"Opportunity: auction at {best.price}p ({best.discount_pct}% under tier '{best.tier}' median of {best.historical_median}p). Buy and relist near median.",
-        })
+        tips.append(
+            {
+                "kind": "buy_flip",
+                "severity": "good",
+                "ru": f"Возможность: лот за {best.price}p (на {best.discount_pct}% ниже median {best.historical_median}p в tier '{best.tier}'). Купи и перевыставь ближе к median.",
+                "en": f"Opportunity: auction at {best.price}p ({best.discount_pct}% under tier '{best.tier}' median of {best.historical_median}p). Buy and relist near median.",
+            }
+        )
 
     # Kuva-roll when the low-tier dominates the listing
     total = god_tier_count + mid_tier_count + low_tier_count
     if total > 0 and low_tier_count / total >= 0.4:
-        tips.append({
-            "kind": "kuva_roll",
-            "severity": "info",
-            "ru": "Много дешёвых лотов в low-tier → подходящее время купить под kuva-ролл (кува бесплатна, шанс попасть в god-tier стат).",
-            "en": "Lots of low-tier listings right now → good moment to buy cheap and roll on kuva (free farm, chance to land god-tier stats).",
-        })
+        tips.append(
+            {
+                "kind": "kuva_roll",
+                "severity": "info",
+                "ru": "Много дешёвых лотов в low-tier → подходящее время купить под kuva-ролл (кува бесплатна, шанс попасть в god-tier стат).",
+                "en": "Lots of low-tier listings right now → good moment to buy cheap and roll on kuva (free farm, chance to land god-tier stats).",
+            }
+        )
 
     # Disposition / patience reminder when god-tier is very expensive
     if god_tier_count >= 3:
-        tips.append({
-            "kind": "watch_disposition",
-            "severity": "warn",
-            "ru": "Перед покупкой dorogого riven проверь disposition оружия — после nerf'а цены резко падают.",
-            "en": "Before buying a high-tier riven check the weapon disposition — nerfs crash prices fast.",
-        })
+        tips.append(
+            {
+                "kind": "watch_disposition",
+                "severity": "warn",
+                "ru": "Перед покупкой dorogого riven проверь disposition оружия — после nerf'а цены резко падают.",
+                "en": "Before buying a high-tier riven check the weapon disposition — nerfs crash prices fast.",
+            }
+        )
 
     # Always include one base educational tip so the panel never empties out.
-    tips.append({
-        "kind": "base_education",
-        "severity": "info",
-        "ru": "Stat-комбинации не равны: ищи аукционы с CD+MS+Dam для оружия с high disposition. Топ-стат у этого оружия показан выше.",
-        "en": "Stat combos aren't equal: look for CD+MS+Dam on high-disposition weapons. Top stats for this weapon are shown above.",
-    })
+    tips.append(
+        {
+            "kind": "base_education",
+            "severity": "info",
+            "ru": "Stat-комбинации не равны: ищи аукционы с CD+MS+Dam для оружия с high disposition. Топ-стат у этого оружия показан выше.",
+            "en": "Stat combos aren't equal: look for CD+MS+Dam on high-disposition weapons. Top stats for this weapon are shown above.",
+        }
+    )
 
     return tips

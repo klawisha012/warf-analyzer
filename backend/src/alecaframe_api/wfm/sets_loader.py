@@ -6,6 +6,7 @@ Each AlecaFrame catalogue entry has `name`, `uniqueName`, and (for sets) a
 through SlugResolver. If any component is unresolvable, the whole set is
 dropped — partial sets would mislead the profit calculator.
 """
+
 from __future__ import annotations
 
 import json
@@ -19,8 +20,13 @@ from alecaframe_api.wfm.slugs import SlugResolver
 log = logging.getLogger("alecaframe.wfm.sets_loader")
 
 _CATALOGUE_FILES = (
-    "Warframes.json", "Primary.json", "Secondary.json", "Melee.json",
-    "Sentinels.json", "Arch-Gun.json", "Arch-Melee.json",
+    "Warframes.json",
+    "Primary.json",
+    "Secondary.json",
+    "Melee.json",
+    "Sentinels.json",
+    "Arch-Gun.json",
+    "Arch-Melee.json",
 )
 
 
@@ -33,7 +39,9 @@ def _to_set_slug(item_name: str) -> str:
 
 
 def load_set_compositions_from_aleca(
-    *, cached_json_dir: Path, resolver: SlugResolver,
+    *,
+    cached_json_dir: Path,
+    resolver: SlugResolver,
 ) -> list[SetComposition]:
     out: list[SetComposition] = []
     for fname in _CATALOGUE_FILES:
@@ -45,8 +53,10 @@ def load_set_compositions_from_aleca(
         except Exception as e:
             log.warning("can't parse %s: %s", path, e)
             continue
-        items = raw if isinstance(raw, list) else (
-            list(raw.values()) if isinstance(raw, dict) else []
+        items = (
+            raw
+            if isinstance(raw, list)
+            else (list(raw.values()) if isinstance(raw, dict) else [])
         )
         for it in items:
             if not isinstance(it, dict):
@@ -67,9 +77,11 @@ def load_set_compositions_from_aleca(
                 parts[slug] = parts.get(slug, 0) + qty
             if bad or not parts:
                 continue
-            out.append(SetComposition(
-                set_slug=_to_set_slug(name),
-                set_name=f"{name} Set" if not name.endswith(" Set") else name,
-                parts=parts,
-            ))
+            out.append(
+                SetComposition(
+                    set_slug=_to_set_slug(name),
+                    set_name=f"{name} Set" if not name.endswith(" Set") else name,
+                    parts=parts,
+                )
+            )
     return out
