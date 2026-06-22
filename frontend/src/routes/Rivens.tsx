@@ -610,11 +610,19 @@ function gradeColorClass(grade: string): Record<string, boolean> {
 }
 
 function GradeCell(props: { row: RivenAuctionRow; lens: ProfileLens }) {
-  const base = createMemo(() => props.row.per_profile.find((p) => p.kind === "base"));
-  const inc = createMemo(() => props.row.per_profile.find((p) => p.kind === "incarnon"));
+  // `per_profile` may be absent on older/cached API payloads (pre-S3b) — guard it.
+  const profiles = createMemo(() => props.row.per_profile ?? []);
+  const base = createMemo(() => profiles().find((p) => p.kind === "base"));
+  const inc = createMemo(() => profiles().find((p) => p.kind === "incarnon"));
+  // Headline fallback for payloads with grade/score but no per_profile array.
+  const headline = createMemo(() =>
+    !props.row.unscored && props.row.grade != null
+      ? { kind: "base", grade: props.row.grade, score: props.row.score ?? 0 }
+      : undefined,
+  );
   // Dual lens: the selected profile is primary (big), the other trails small, so
   // the Base→Incarnon delta is always visible (the whole point of Incarnon scoring).
-  const primary = createMemo(() => (props.lens === "incarnon" ? inc() : base()) ?? base() ?? inc());
+  const primary = createMemo(() => (props.lens === "incarnon" ? inc() : base()) ?? base() ?? inc() ?? headline());
   const secondary = createMemo(() => (props.lens === "incarnon" ? base() : inc()));
   return (
     <Show
