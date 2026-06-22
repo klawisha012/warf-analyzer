@@ -22,10 +22,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from alecaframe_api.db.repo import Repo
+from alecaframe_api.reference.incarnon_profiles import (
+    IncarnonProfile, incarnon_index, is_outdated,
+)
 from alecaframe_api.schemas import (
     RivenAuctionRow, RivenAuctionsResponse, RivenHistoryResponse,
-    RivenOutlier, RivenSnapshotRow, RivenStrategyTip, RivenTierStats,
-    RivenTopAttribute, RivenWatchAddRequest, RivenWatchEntry,
+    RivenOutlier, RivenProfileScore, RivenSnapshotRow, RivenStrategyTip,
+    RivenTierStats, RivenTopAttribute, RivenWatchAddRequest, RivenWatchEntry,
     RivenWatchlistResponse,
 )
 from alecaframe_api.wfm.auctions_client import WFMAuctionClient, WFMAuctionError
@@ -36,7 +39,7 @@ from alecaframe_api.wfm.rivens_analysis import (
 )
 from alecaframe_api.wfm.riven_scoring import (
     Profile, build_profiles, classify_market_signal, is_scoreable_category,
-    resolve_weapon, score_riven,
+    normalize_name, resolve_weapon, score_riven,
 )
 
 log = logging.getLogger("alecaframe.wfm.rivens_router")
@@ -78,12 +81,17 @@ def _to_row(
     grade = score = None
     unscored = False
     reason = None
+    per_profile: list[RivenProfileScore] = []
     if profiles:
         rs = score_riven(attrs, profiles)
         if rs.unscored:
             unscored, reason = True, rs.reason
         else:
             grade, score = rs.headline.grade, rs.headline.score
+            per_profile = [
+                RivenProfileScore(kind=ps.kind, grade=ps.grade, score=ps.score)
+                for ps in rs.per_profile
+            ]
     elif weapon_unscored_reason:
         unscored, reason = True, weapon_unscored_reason
 
@@ -107,43 +115,47 @@ def _to_row(
         score=score,
         unscored=unscored,
         unscored_reason=reason,
+        per_profile=per_profile,
         market_signal=market_signal,
     )
 
 
 async def _resolve_weapon_profiles(
     weapon_slug: str, client: WFMAuctionClient, repo,
-) -> tuple[list[Profile], str | None]:
-    """Resolve a weapon's scoring profiles via slug -> item_name -> base stats.
+) -> tuple[list[Profile], str | None, IncarnonProfile | None]:
+    """Resolve a weapon's scoring profiles via slug -> item_name -> base stats,
+    plus its curated Incarnon profile when one exists.
 
-    Returns (profiles, unscored_reason). profiles is empty and a reason is set
-    when the weapon can't be scored (no base profile, melee, fetch failure).
+    Returns (profiles, unscored_reason, incarnon). profiles is empty and a
+    reason is set when the weapon can't be scored (no base profile, melee,
+    fetch failure); incarnon is the curated profile or None.
     """
     try:
         weapons = await client.get_riven_weapons()
     except WFMAuctionError:
         # An outage is not "we have no data for this weapon" — keep it distinct
         # so the UI doesn't imply the weapon is unsupported.
-        return [], "weapon_fetch_failed"
+        return [], "weapon_fetch_failed", None
     item_name = next(
         (w.get("item_name") for w in weapons if w.get("url_name") == weapon_slug), None,
     )
     if not item_name:
         log.info("riven scoring: slug %r not in riven-weapons catalogue", weapon_slug)
-        return [], "no_base_profile"
+        return [], "no_base_profile", None
     base_row = resolve_weapon(item_name, await repo.weapon_base_stats_index())
     if base_row is None:
         # Log the name-join miss so WEAPON_NAME_OVERRIDES can grow on real gaps.
         log.info("riven scoring: no base-stats row for %r (slug %r)", item_name, weapon_slug)
-        return [], "no_base_profile"
+        return [], "no_base_profile", None
     category = base_row.get("category")
     if not is_scoreable_category(category):
         reason = "melee_out_of_scope_m1" if category in ("melee", "arch_melee") else "category_out_of_scope_m1"
-        return [], reason
-    profiles = build_profiles(base_row)
+        return [], reason, None
+    incarnon = incarnon_index().get(normalize_name(item_name))
+    profiles = build_profiles(base_row, incarnon=incarnon)
     if not profiles:
-        return [], "incomplete_base_stats"
-    return profiles, None
+        return [], "incomplete_base_stats", None
+    return profiles, None, incarnon
 
 
 def _safe_int(v) -> int | None:
@@ -178,7 +190,7 @@ async def riven_auctions(
         raise HTTPException(503, str(e)) from e
 
     # Resolve the weapon's scoring profiles once per request (not per auction).
-    profiles, weapon_unscored_reason = await _resolve_weapon_profiles(weapon_slug, client, repo)
+    profiles, weapon_unscored_reason, incarnon = await _resolve_weapon_profiles(weapon_slug, client, repo)
 
     tiers_raw = classify_tiers(auctions)
     # Overall median is the fair-price reference for the steal/trap signal (S4).
@@ -265,6 +277,9 @@ async def riven_auctions(
         stale=False, tiers=tiers_rows, stats=stats_models,
         outliers=outliers, top_attributes=top_attrs, strategies=strategies,
         avoid_negatives=avoid, harmless_negatives=harmless,
+        has_incarnon_profile=incarnon is not None,
+        incarnon_game_version=incarnon.game_version if incarnon else None,
+        incarnon_outdated=is_outdated(incarnon) if incarnon else False,
     )
 
 

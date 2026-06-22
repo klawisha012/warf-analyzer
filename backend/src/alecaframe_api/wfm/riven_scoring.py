@@ -250,25 +250,45 @@ def is_scoreable_category(category: str | None) -> bool:
     return category in _SCOREABLE_CATEGORIES
 
 
-def build_profiles(weapon_row: dict) -> list[Profile]:
-    """Compute a weapon's combat profiles. M1 ships the base form only;
-    Incarnon/perk profiles are added in S3 behind the same interface.
+def build_profiles(weapon_row: dict, incarnon=None) -> list[Profile]:
+    """Compute a weapon's combat profile set: base (+ Incarnon when curated).
 
-    Returns [] when the row has no usable base stats (a WFCD data gap) so the
-    caller renders it as `unscored` rather than emitting a confident grade off
-    of all-zero stats. `omega_attenuation` is plumbed here but consumed in S2's
-    roll-value grading, not in S1's presence-based score.
+    Returns [] when the row has no usable base stats AND no Incarnon profile (a
+    WFCD data gap) so the caller renders it as `unscored` rather than emitting a
+    confident grade off all-zero stats.
+
+    `incarnon` is duck-typed (any object exposing `crit_chance`, `status_chance`,
+    `weapon_type`, optional `crit_damage`) — typically a reference
+    `IncarnonProfile`. Kept structural so scoring stays decoupled from the
+    reference layer (no import cycle). The Incarnon profile inherits the
+    weapon's disposition (Incarnon shares the base weapon's omegaAttenuation).
     """
+    profiles: list[Profile] = []
     stats = weapon_row.get("stats") or {}
-    if not stats:
-        return []
-    return [Profile(
-        kind="base",
-        critness=critness(stats),
-        statusness=statusness(stats),
-        stats=stats,
-        omega_attenuation=stats.get("omega_attenuation") or 1.0,
-    )]
+    dispo = stats.get("omega_attenuation") or 1.0
+    if stats:
+        profiles.append(Profile(
+            kind="base",
+            critness=critness(stats),
+            statusness=statusness(stats),
+            stats=stats,
+            omega_attenuation=dispo,
+        ))
+    if incarnon is not None:
+        inc_stats = {
+            "crit_chance": incarnon.crit_chance,
+            "status_chance": incarnon.status_chance,
+            "crit_damage": getattr(incarnon, "crit_damage", None),
+            "type": incarnon.weapon_type,
+        }
+        profiles.append(Profile(
+            kind="incarnon",
+            critness=critness(inc_stats),
+            statusness=statusness(inc_stats),
+            stats=inc_stats,
+            omega_attenuation=dispo,
+        ))
+    return profiles
 
 
 def _grade(score: int) -> str:
@@ -308,17 +328,27 @@ def _score_one(attrs: list[dict], profile: Profile) -> ProfileScore:
     return ProfileScore(kind=profile.kind, score=score, grade=_grade(score))
 
 
+# How close an Incarnon profile must be to the top score to win the headline.
+# Endgame play is through the Incarnon form, so when it's within a few points of
+# the best profile it's the default the player cares about.
+_HEADLINE_EPSILON = 5
+
+
 def score_riven(attrs: list[dict], profiles: list[Profile]) -> RivenScore:
     """Score a riven (its attribute list) against a weapon's profile set.
 
-    Headline = the best-scoring profile (M1 has only `base`; S3 adds the
-    Incarnon-preferring tiebreak). Callers handle the unscored case via
-    `score_unscored`.
+    Headline = the best-scoring profile, except an Incarnon profile within
+    `_HEADLINE_EPSILON` of the best wins (endgame default). Callers handle the
+    unscored case via `score_unscored`.
     """
     if not profiles:
         return score_unscored("no_base_profile")
     per_profile = [_score_one(attrs, p) for p in profiles]
-    headline = max(per_profile, key=lambda ps: ps.score)
+    best = max(per_profile, key=lambda ps: ps.score)
+    headline = best
+    inc = next((ps for ps in per_profile if ps.kind == "incarnon"), None)
+    if inc is not None and inc.score >= best.score - _HEADLINE_EPSILON:
+        headline = inc
     return RivenScore(unscored=False, headline=headline, per_profile=per_profile)
 
 

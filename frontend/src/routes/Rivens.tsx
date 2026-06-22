@@ -225,6 +225,7 @@ function WatchlistPanel(p: {
 const PAGE_SIZE = 20;
 const TIER_NAMES = ["god", "mid", "low"] as const;
 type TierName = (typeof TIER_NAMES)[number];
+type ProfileLens = "base" | "incarnon";
 
 function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
   const auctions = createQuery(() => ({
@@ -240,6 +241,12 @@ function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
 
   const [statusFilter, setStatusFilter] = createSignal<"all" | "online" | "ingame">("all");
   const [tierFilter, setTierFilter] = createSignal<TierName | "all">("all");
+  // Page-level scoring lens: which combat profile drives the primary grade shown
+  // on every card. Defaults to Incarnon (endgame) when the weapon has one.
+  const [lens, setLens] = createSignal<ProfileLens>("incarnon");
+  const hasIncarnon = createMemo(() => auctions.data?.has_incarnon_profile ?? false);
+  // No Incarnon profile → there is no toggle, so force the base lens.
+  const effectiveLens = createMemo<ProfileLens>(() => (hasIncarnon() ? lens() : "base"));
 
   function filterRows(rows: RivenAuctionRow[]): RivenAuctionRow[] {
     const f = statusFilter();
@@ -303,6 +310,11 @@ function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
             setStatusFilter={setStatusFilter}
             tierFilter={tierFilter()}
             setTierFilter={setTierFilter}
+            hasIncarnon={hasIncarnon()}
+            lens={effectiveLens()}
+            setLens={setLens}
+            incarnonVersion={auctions.data!.incarnon_game_version}
+            incarnonOutdated={auctions.data!.incarnon_outdated}
           />
 
           <Card title={t("rivens.tierStats")}>
@@ -354,7 +366,7 @@ function WeaponView(p: { slug: string; weapon?: RivenWeapon }) {
               return (
                 <Show when={rows().length > 0}>
                   <Card title={`${t(tier.key as never)} · ${rows().length}`}>
-                    <PaginatedAuctionTable rows={rows()} outliers={auctions.data!.outliers} />
+                    <PaginatedAuctionTable rows={rows()} outliers={auctions.data!.outliers} lens={effectiveLens()} />
                   </Card>
                 </Show>
               );
@@ -375,6 +387,11 @@ function FiltersBar(p: {
   setStatusFilter: (v: "all" | "online" | "ingame") => void;
   tierFilter: TierName | "all";
   setTierFilter: (v: TierName | "all") => void;
+  hasIncarnon: boolean;
+  lens: ProfileLens;
+  setLens: (v: ProfileLens) => void;
+  incarnonVersion: string | null;
+  incarnonOutdated: boolean;
 }) {
   return (
     <div class="flex flex-wrap items-center gap-4 px-3 py-2.5 surface">
@@ -411,11 +428,39 @@ function FiltersBar(p: {
           </For>
         </div>
       </div>
+      {/* Page-level scoring lens — only when the weapon has a curated Incarnon
+          profile (no toggle = no dead control). */}
+      <Show when={p.hasIncarnon}>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-dim">{t("rivens.scoringFor")}:</span>
+          <div class="seg">
+            <For each={[
+              { v: "base" as const, label: t("rivens.lensBase") },
+              { v: "incarnon" as const, label: t("rivens.lensIncarnon") },
+            ]}>
+              {(opt) => (
+                <button type="button" class="seg-btn" classList={{ active: p.lens === opt.v }} onClick={() => p.setLens(opt.v)}>
+                  {opt.label}
+                </button>
+              )}
+            </For>
+          </div>
+          <span
+            class="text-[11px]"
+            classList={{ "text-amber-300": p.incarnonOutdated, "text-dim": !p.incarnonOutdated }}
+            title={p.incarnonVersion ?? ""}
+          >
+            {p.incarnonOutdated
+              ? t("rivens.incarnonOutdated")
+              : t("rivens.incarnonAsOf", { v: p.incarnonVersion ?? "?" })}
+          </span>
+        </div>
+      </Show>
     </div>
   );
 }
 
-function PaginatedAuctionTable(props: { rows: RivenAuctionRow[]; outliers: RivenOutlier[] }) {
+function PaginatedAuctionTable(props: { rows: RivenAuctionRow[]; outliers: RivenOutlier[]; lens: ProfileLens }) {
   const [page, setPage] = createSignal(0);
   const totalPages = createMemo(() => Math.max(1, Math.ceil(props.rows.length / PAGE_SIZE)));
   createMemo(() => { if (page() >= totalPages()) setPage(0); });
@@ -425,7 +470,7 @@ function PaginatedAuctionTable(props: { rows: RivenAuctionRow[]; outliers: Riven
   });
   return (
     <div class="space-y-2">
-      <AuctionTable rows={pageRows()} outliers={props.outliers} />
+      <AuctionTable rows={pageRows()} outliers={props.outliers} lens={props.lens} />
       <Show when={totalPages() > 1}>
         <div class="flex items-center justify-between text-xs text-sub">
           <button type="button" disabled={page() === 0} onClick={() => setPage(page() - 1)} class="px-2.5 py-1 rounded-lg border border-line hover:text-fg hover:bg-white/[0.03] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">←</button>
@@ -555,7 +600,51 @@ function StrategyList(props: { tips: RivenStrategyTip[] }) {
   );
 }
 
-function AuctionTable(props: { rows: RivenAuctionRow[]; outliers: RivenOutlier[] }) {
+function gradeColorClass(grade: string): Record<string, boolean> {
+  return {
+    "text-mint": grade === "S" || grade === "A",
+    "text-cyan": grade === "B",
+    "text-amber": grade === "C",
+    "text-rose-300": grade === "F",
+  };
+}
+
+function GradeCell(props: { row: RivenAuctionRow; lens: ProfileLens }) {
+  const base = createMemo(() => props.row.per_profile.find((p) => p.kind === "base"));
+  const inc = createMemo(() => props.row.per_profile.find((p) => p.kind === "incarnon"));
+  // Dual lens: the selected profile is primary (big), the other trails small, so
+  // the Base→Incarnon delta is always visible (the whole point of Incarnon scoring).
+  const primary = createMemo(() => (props.lens === "incarnon" ? inc() : base()) ?? base() ?? inc());
+  const secondary = createMemo(() => (props.lens === "incarnon" ? base() : inc()));
+  return (
+    <Show
+      when={!props.row.unscored && primary()}
+      fallback={<span class="text-dim" title={props.row.unscored_reason ?? ""}>—</span>}
+    >
+      <span class="font-bold" classList={gradeColorClass(primary()!.grade)}>{primary()!.grade}</span>
+      <span class="text-[10px] text-dim num"> · {primary()!.score}</span>
+      <Show when={secondary()}>
+        <span class="text-[10px] text-dim">
+          {" "}({props.lens === "incarnon" ? t("rivens.lensBase") : t("rivens.lensIncarnon")} {secondary()!.grade})
+        </span>
+      </Show>
+      <Show when={props.row.market_signal === "steal" || props.row.market_signal === "trap"}>
+        <span
+          class="ml-1 text-[10px] px-1 rounded font-semibold"
+          classList={{
+            "bg-mint/20 text-mint": props.row.market_signal === "steal",
+            "bg-rose-500/15 text-rose-300": props.row.market_signal === "trap",
+          }}
+          title={t(props.row.market_signal === "steal" ? "rivens.stealHint" : "rivens.trapHint")}
+        >
+          {props.row.market_signal === "steal" ? `🔥 ${t("rivens.steal")}` : `⚠ ${t("rivens.trap")}`}
+        </span>
+      </Show>
+    </Show>
+  );
+}
+
+function AuctionTable(props: { rows: RivenAuctionRow[]; outliers: RivenOutlier[]; lens: ProfileLens }) {
   const outlierIds = new Set(props.outliers.map((o) => o.auction_id));
   return (
     <div class="overflow-auto">
@@ -581,35 +670,7 @@ function AuctionTable(props: { rows: RivenAuctionRow[]; outliers: RivenOutlier[]
                 title={t("rivens.openInWfm")}
               >
                 <td class="py-1.5 px-2 whitespace-nowrap">
-                  <Show
-                    when={!r.unscored && r.grade}
-                    fallback={<span class="text-dim" title={r.unscored_reason ?? ""}>—</span>}
-                  >
-                    <span
-                      class="font-bold"
-                      classList={{
-                        "text-mint": r.grade === "S" || r.grade === "A",
-                        "text-cyan": r.grade === "B",
-                        "text-amber": r.grade === "C",
-                        "text-rose-300": r.grade === "F",
-                      }}
-                    >
-                      {r.grade}
-                    </span>
-                    <span class="text-[10px] text-dim num"> · {r.score}</span>
-                    <Show when={r.market_signal === "steal" || r.market_signal === "trap"}>
-                      <span
-                        class="ml-1 text-[10px] px-1 rounded font-semibold"
-                        classList={{
-                          "bg-mint/20 text-mint": r.market_signal === "steal",
-                          "bg-rose-500/15 text-rose-300": r.market_signal === "trap",
-                        }}
-                        title={t(r.market_signal === "steal" ? "rivens.stealHint" : "rivens.trapHint")}
-                      >
-                        {r.market_signal === "steal" ? `🔥 ${t("rivens.steal")}` : `⚠ ${t("rivens.trap")}`}
-                      </span>
-                    </Show>
-                  </Show>
+                  <GradeCell row={r} lens={props.lens} />
                 </td>
                 <td class="py-1.5 px-2 text-right num text-fg">{fmtPlat(r.buyout_price)}</td>
                 <td class="py-1.5 px-2 text-right num text-sub">{fmtPlat(r.top_bid)}</td>

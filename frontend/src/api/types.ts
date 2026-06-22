@@ -180,8 +180,17 @@ export type RivenAuctionRow = {
   score: number | null;
   unscored: boolean;
   unscored_reason: string | null;
+  // Score per combat profile (base + incarnon when curated) for inline dual
+  // grades ("Base C → Incarnon S"). Empty when unscored. (S3b)
+  per_profile: RivenProfileScore[];
   // Quality x price: "steal" (S/A under median), "trap" (F over median), null. (S4)
   market_signal: string | null;
+};
+
+export type RivenProfileScore = {
+  kind: "base" | "incarnon" | string;
+  grade: string;
+  score: number;
 };
 
 export type RivenTierStats = {
@@ -226,6 +235,11 @@ export type RivenAuctionsResponse = {
   strategies: RivenStrategyTip[];
   avoid_negatives: string[];
   harmless_negatives: string[];
+  // Incarnon scoring lens (S3b): gates the page-level Base/Incarnon toggle and
+  // the data-freshness badge.
+  has_incarnon_profile: boolean;
+  incarnon_game_version: string | null;
+  incarnon_outdated: boolean;
 };
 
 export type RivenWatchEntry = {

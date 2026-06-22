@@ -274,6 +274,12 @@ class RivenAuctionAttribute(BaseModel):
     positive: bool
 
 
+class RivenProfileScore(BaseModel):
+    kind: str          # 'base' | 'incarnon'
+    grade: str         # S/A/B/C/F
+    score: int         # 0-100
+
+
 class RivenAuctionRow(BaseModel):
     auction_id: str
     weapon_slug: str
@@ -287,13 +293,16 @@ class RivenAuctionRow(BaseModel):
     owner_status: str | None = None         # 'ingame' | 'online' | 'offline'
     tier: str
     attributes: list[RivenAuctionAttribute] = []
-    # Weapon-aware quality score (base profile in M1). `grade`/`score` are null
-    # when `unscored` is set (no base profile, melee, etc. — reason in
-    # `unscored_reason`). Per-profile/Incarnon scores arrive in S3.
+    # Weapon-aware quality score. `grade`/`score` are the HEADLINE profile
+    # (Incarnon-preferred when present, per the ε-tiebreak), null when
+    # `unscored` (no base profile, melee, etc. — reason in `unscored_reason`).
     grade: str | None = None
     score: int | None = None
     unscored: bool = False
     unscored_reason: str | None = None
+    # Score per combat profile (base + Incarnon when curated) so the UI can show
+    # the delta inline ("Base C → Incarnon S"). Empty when unscored. Added in S3b.
+    per_profile: list[RivenProfileScore] = []
     # Quality grade crossed with market price: "steal" (S/A under median),
     # "trap" (F over median), or null (fair / unscored). Added in S4.
     market_signal: str | None = None
@@ -341,6 +350,12 @@ class RivenAuctionsResponse(BaseModel):
     strategies: list[RivenStrategyTip]
     avoid_negatives: list[str] = []
     harmless_negatives: list[str] = []
+    # Incarnon scoring lens (S3b). `has_incarnon_profile` gates the page-level
+    # Base/Incarnon toggle; freshness fields drive the "data as of <build>" /
+    # "may be outdated" badge. Null/false when no curated Incarnon profile.
+    has_incarnon_profile: bool = False
+    incarnon_game_version: str | None = None
+    incarnon_outdated: bool = False
 
 
 class RivenWatchEntry(BaseModel):
